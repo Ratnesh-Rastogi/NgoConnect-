@@ -1,18 +1,28 @@
 import { Router } from 'express';
 import * as ngoController from '../controllers/ngoController.js';
-import { validateBody } from '../middlewares/validate.js';
+import { validateBody, validateQuery } from '../middlewares/validate.js';
 import { authenticateUser, optionalAuth, requireRoles } from '../middlewares/auth.js';
 import { uploadSingleDocument } from '../middlewares/upload.js';
+import { urgentSearchRateLimiter } from '../middlewares/rateLimiter.js';
 import {
   updateNgoStatusSchema,
   updateNgoProfileSchema,
-  uploadDocumentSchema
+  uploadDocumentSchema,
+  urgentSearchQuerySchema
 } from '../validators/ngoValidator.js';
 
 const router = Router();
 
 // Public: view approved NGOs
 router.get('/', ngoController.listApproved);
+
+// Public: urgent help search (must be declared before /:id)
+router.get(
+  '/search',
+  urgentSearchRateLimiter,
+  validateQuery(urgentSearchQuerySchema),
+  ngoController.searchUrgent
+);
 
 // NGO owner routes (must be declared before /:id)
 router.put(

@@ -6,8 +6,23 @@ export const authRateLimiter = rateLimit({
   max: 50, // Limit each IP to 50 login/register requests per windowMs
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === 'test',
   message: { error: 'Too many authentication attempts. Please try again later.' },
   handler: (req, res, next, options) => {
     res.status(429).json(options.message);
   }
 });
+
+// Rate limiter for urgent help search route to prevent scraping/abuse
+export const urgentSearchRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === 'test',
+  message: { error: 'Too many search requests. Please slow down.' },
+  handler: (req, res, next, options) => {
+    res.status(429).json(options.message);
+  }
+});
+

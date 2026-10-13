@@ -11,7 +11,8 @@ import {
   Bell,
   Check,
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  AlertCircle
 } from 'lucide-react';
 
 export const Navbar = ({ currentView, setCurrentView }) => {
@@ -149,10 +150,33 @@ export const Navbar = ({ currentView, setCurrentView }) => {
               <Sparkles className="w-4 h-4 text-purple-600" />
               <span>AI Matcher</span>
             </button>
+            <button
+              onClick={() => setCurrentView('urgent-help')}
+              className={`px-3 py-1.5 rounded-lg transition-all flex items-center space-x-1.5 font-bold border ${
+                currentView === 'urgent-help'
+                  ? 'bg-rose-50 text-rose-700 border-rose-300 shadow-xs'
+                  : 'text-rose-700 bg-rose-50/50 hover:bg-rose-100/70 border-rose-200'
+              }`}
+            >
+              <AlertCircle className="w-4 h-4 text-rose-600" />
+              <span>Need help urgently?</span>
+            </button>
           </nav>
 
           {/* User Auth Section */}
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2 sm:space-x-3">
+            {/* Mobile Urgent Help Button */}
+            <button
+              onClick={() => setCurrentView('urgent-help')}
+              className={`md:hidden px-2 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1 border ${
+                currentView === 'urgent-help'
+                  ? 'bg-rose-50 text-rose-700 border-rose-300 shadow-xs'
+                  : 'text-rose-700 bg-rose-50/60 hover:bg-rose-100 border-rose-200'
+              }`}
+            >
+              <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+              <span>Urgent Help</span>
+            </button>
             {user ? (
               <div className="flex items-center space-x-3">
                 {/* Role-Specific Dashboard Shortcut */}

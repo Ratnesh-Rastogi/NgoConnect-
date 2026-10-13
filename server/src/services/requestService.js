@@ -143,6 +143,10 @@ export const listRequests = async (filters = {}) => {
     ];
   }
 
+  const page = Math.max(parseInt(filters.page, 10) || 1, 1);
+  const limit = Math.min(Math.max(parseInt(filters.limit || filters.take, 10) || 50, 1), 100);
+  const skip = filters.skip ? Math.max(parseInt(filters.skip, 10) || 0, 0) : (page - 1) * limit;
+
   return prisma.resourceRequest.findMany({
     where,
     include: {
@@ -152,7 +156,9 @@ export const listRequests = async (filters = {}) => {
     orderBy: [
       { urgency: 'desc' },
       { createdAt: 'desc' }
-    ]
+    ],
+    take: limit,
+    skip
   });
 };
 
@@ -294,6 +300,7 @@ export const listMyNgoRequests = async (userId) => {
         orderBy: { createdAt: 'desc' }
       }
     },
-    orderBy: { createdAt: 'desc' }
+    orderBy: { createdAt: 'desc' },
+    take: 100
   });
 };

@@ -2,21 +2,21 @@ import { z } from 'zod';
 
 export const registerSchema = z
   .object({
-    email: z.string().email('Valid email address is required'),
+    email: z.string().trim().email('Valid email address is required'),
     password: z.string().min(6, 'Password must be at least 6 characters long'),
-    name: z.string().min(2, 'Name must be at least 2 characters long'),
+    name: z.string().trim().min(2, 'Name must be at least 2 characters long'),
     role: z.enum(['donor', 'ngo'], {
       errorMap: () => ({ message: "Role must be either 'donor' or 'ngo'" })
     }),
     // NGO specific fields (required if role === 'ngo')
-    orgName: z.string().min(2, 'Organization name is required for NGOs').optional(),
-    regNumber: z.string().min(2, 'Registration number is required for NGOs').optional(),
-    description: z.string().min(5, 'Organization description is required for NGOs').optional(),
-    categoryId: z.string().optional(),
-    category: z.string().optional(),
-    contactPhone: z.string().min(5, 'Contact phone is required for NGOs').optional(),
-    address: z.string().min(3, 'Address is required for NGOs').optional(),
-    city: z.string().min(2, 'City is required for NGOs').optional()
+    orgName: z.string().trim().min(2, 'Organization name is required for NGOs').optional(),
+    regNumber: z.string().trim().min(2, 'Registration number is required for NGOs').optional(),
+    description: z.string().trim().min(5, 'Organization description is required for NGOs').optional(),
+    categoryId: z.string().trim().optional(),
+    category: z.string().trim().optional(),
+    contactPhone: z.string().trim().min(5, 'Contact phone is required for NGOs').optional(),
+    address: z.string().trim().min(3, 'Address is required for NGOs').optional(),
+    city: z.string().trim().min(2, 'City is required for NGOs').optional()
   })
   .superRefine((data, ctx) => {
     if (data.role === 'ngo') {
@@ -48,6 +48,6 @@ export const registerSchema = z
   });
 
 export const loginSchema = z.object({
-  email: z.string().email('Valid email is required'),
+  email: z.string().trim().email('Valid email is required'),
   password: z.string().min(1, 'Password is required')
 });

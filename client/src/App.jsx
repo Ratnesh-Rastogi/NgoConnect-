@@ -13,16 +13,48 @@ import { BrowseResourcesPage } from './pages/BrowseResourcesPage.jsx';
 import { CreateResourcePage } from './pages/CreateResourcePage.jsx';
 import { MyResourcesPage } from './pages/MyResourcesPage.jsx';
 import { NotificationsPage } from './pages/NotificationsPage.jsx';
+import { UrgentHelpPage } from './pages/UrgentHelpPage.jsx';
 import { HeartHandshake } from 'lucide-react';
 
 const MainLayout = () => {
-  const [currentView, setCurrentView] = useState('home');
+  const [currentView, setCurrentView] = useState(() => {
+    if (typeof window !== 'undefined' && window.location.pathname === '/urgent-help') {
+      return 'urgent-help';
+    }
+    return 'home';
+  });
   const { user } = useAuth();
+
+  React.useEffect(() => {
+    if (currentView === 'urgent-help') {
+      if (window.location.pathname !== '/urgent-help') {
+        window.history.pushState({}, '', '/urgent-help');
+      }
+    } else if (currentView === 'home') {
+      if (window.location.pathname === '/urgent-help') {
+        window.history.pushState({}, '', '/');
+      }
+    }
+  }, [currentView]);
+
+  React.useEffect(() => {
+    const handlePopState = () => {
+      if (window.location.pathname === '/urgent-help') {
+        setCurrentView('urgent-help');
+      } else {
+        setCurrentView('home');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   const renderContent = () => {
     switch (currentView) {
       case 'home':
         return <HomePage onNavigate={setCurrentView} />;
+      case 'urgent-help':
+        return <UrgentHelpPage onNavigate={setCurrentView} />;
       case 'browse-resources':
         return <BrowseResourcesPage onNavigate={setCurrentView} />;
       case 'create-resource':

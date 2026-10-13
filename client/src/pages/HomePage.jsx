@@ -76,6 +76,13 @@ export const HomePage = ({ onNavigate }) => {
           </p>
           <div className="flex flex-wrap gap-3 pt-2">
             <button
+              onClick={() => onNavigate?.('urgent-help')}
+              className="bg-rose-600 hover:bg-rose-700 text-white font-bold px-5 py-2.5 rounded-xl text-xs sm:text-sm shadow-md transition-all flex items-center space-x-2"
+            >
+              <AlertCircle className="w-4 h-4" />
+              <span>Need help urgently?</span>
+            </button>
+            <button
               onClick={() => onNavigate?.('ai-matcher')}
               className="bg-white text-emerald-900 hover:bg-emerald-50 font-bold px-5 py-2.5 rounded-xl text-xs sm:text-sm shadow-md transition-all flex items-center space-x-2"
             >

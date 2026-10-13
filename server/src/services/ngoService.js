@@ -1,5 +1,6 @@
 import { prisma } from '../config/prisma.js';
 import { AppError } from '../errors/AppError.js';
+import { resolveCityCoordinates } from '../utils/geo.js';
 import {
   saveFile,
   getFile,
@@ -35,10 +36,19 @@ export const listApprovedNgos = async (filters = {}) => {
     ];
   }
 
+  const page = Math.max(parseInt(filters.page, 10) || 1, 1);
+  const limit = Math.min(Math.max(parseInt(filters.limit || filters.take, 10) || 50, 1), 100);
+  const skip = filters.skip ? Math.max(parseInt(filters.skip, 10) || 0, 0) : (page - 1) * limit;
+
   return prisma.ngoProfile.findMany({
     where,
-    include: { category: true },
-    orderBy: { orgName: 'asc' }
+    include: {
+      category: true,
+      services: { include: { category: true } }
+    },
+    orderBy: { orgName: 'asc' },
+    take: limit,
+    skip
   });
 };
 
@@ -49,6 +59,7 @@ export const getNgoById = async (id) => {
     include: {
       user: true,
       category: true,
+      services: { include: { category: true } },
       documents: {
         orderBy: { createdAt: 'desc' }
       },
@@ -71,11 +82,17 @@ export const getNgoById = async (id) => {
 };
 
 // Admin only: list all NGOs across all verification statuses
-export const listAllNgosForAdmin = async (status) => {
+export const listAllNgosForAdmin = async (queryOrStatus) => {
   const where = {};
+  const status = typeof queryOrStatus === 'string' ? queryOrStatus : queryOrStatus?.status;
   if (status) {
     where.verificationStatus = status;
   }
+
+  const filters = typeof queryOrStatus === 'object' && queryOrStatus !== null ? queryOrStatus : {};
+  const page = Math.max(parseInt(filters.page, 10) || 1, 1);
+  const limit = Math.min(Math.max(parseInt(filters.limit || filters.take, 10) || 50, 1), 100);
+  const skip = filters.skip ? Math.max(parseInt(filters.skip, 10) || 0, 0) : (page - 1) * limit;
 
   return prisma.ngoProfile.findMany({
     where,
@@ -93,7 +110,9 @@ export const listAllNgosForAdmin = async (status) => {
         select: { requests: true, transfersReceived: true, documents: true }
       }
     },
-    orderBy: { createdAt: 'desc' }
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+    skip
   });
 };
 
@@ -192,21 +211,154 @@ export const updateMyNgoProfile = async (userId, data) => {
     throw new AppError('NGO profile not found for this user', 404);
   }
 
-  return prisma.ngoProfile.update({
-    where: { id: ngo.id },
-    data: {
-      orgName: data.orgName ?? ngo.orgName,
-      description: data.description ?? ngo.description,
-      contactPhone: data.contactPhone ?? ngo.contactPhone,
-      address: data.address ?? ngo.address,
-      city: data.city ?? ngo.city
-    },
+  // Handle serviceCategoryIds validation
+  let uniqueCategoryIds;
+  if (data.serviceCategoryIds !== undefined) {
+    uniqueCategoryIds = [...new Set(data.serviceCategoryIds)];
+    if (uniqueCategoryIds.length > 10) {
+      throw new AppError('At most 10 services allowed', 400);
+    }
+    if (uniqueCategoryIds.length > 0) {
+      const existingCategories = await prisma.category.findMany({
+        where: { id: { in: uniqueCategoryIds } },
+        select: { id: true }
+      });
+      if (existingCategories.length !== uniqueCategoryIds.length) {
+        throw new AppError('One or more category IDs do not exist', 400);
+      }
+    }
+  }
+
+  return prisma.$transaction(async (tx) => {
+    if (uniqueCategoryIds !== undefined) {
+      // Replace the NgoService rows inside one transaction
+      await tx.ngoService.deleteMany({
+        where: { ngoId: ngo.id }
+      });
+      if (uniqueCategoryIds.length > 0) {
+        await tx.ngoService.createMany({
+          data: uniqueCategoryIds.map((cid) => ({
+            ngoId: ngo.id,
+            categoryId: cid
+          }))
+        });
+      }
+    }
+
+    return tx.ngoProfile.update({
+      where: { id: ngo.id },
+      data: {
+        orgName: data.orgName ?? ngo.orgName,
+        description: data.description ?? ngo.description,
+        contactPhone: data.contactPhone ?? ngo.contactPhone,
+        address: data.address ?? ngo.address,
+        city: data.city ?? ngo.city,
+        publicEmail: data.publicEmail !== undefined ? data.publicEmail : ngo.publicEmail,
+        publicPhone: data.publicPhone !== undefined ? data.publicPhone : ngo.publicPhone,
+        whatsappNumber: data.whatsappNumber !== undefined ? data.whatsappNumber : ngo.whatsappNumber,
+        website: data.website !== undefined ? data.website : ngo.website,
+        facebookUrl: data.facebookUrl !== undefined ? data.facebookUrl : ngo.facebookUrl,
+        instagramUrl: data.instagramUrl !== undefined ? data.instagramUrl : ngo.instagramUrl,
+        showFullAddress: data.showFullAddress !== undefined ? data.showFullAddress : ngo.showFullAddress,
+        emergencyAvailable: data.emergencyAvailable !== undefined ? data.emergencyAvailable : ngo.emergencyAvailable,
+        available24x7: data.available24x7 !== undefined ? data.available24x7 : ngo.available24x7,
+        serviceAreaNote: data.serviceAreaNote !== undefined ? data.serviceAreaNote : ngo.serviceAreaNote
+      },
+      include: {
+        user: true,
+        category: true,
+        documents: true,
+        services: { include: { category: true } }
+      }
+    });
+  });
+};
+
+// Public: urgent help finder with ranking and pagination
+export const searchUrgentNgos = async (query = {}) => {
+  const { category, city, state, emergency, page = 1, limit = 12 } = query;
+  const pageNum = Math.max(1, parseInt(page, 10) || 1);
+  const limitNum = Math.min(20, Math.max(1, parseInt(limit, 10) || 12));
+
+  const where = {
+    verificationStatus: 'APPROVED'
+  };
+
+  if (emergency === true || emergency === 'true') {
+    where.emergencyAvailable = true;
+  }
+
+  if (category) {
+    const categoryIds = Array.isArray(category)
+      ? category
+      : typeof category === 'string'
+      ? category.split(',').map((c) => c.trim()).filter(Boolean)
+      : [];
+
+    if (categoryIds.length > 0) {
+      where.OR = [
+        { categoryId: { in: categoryIds } },
+        { services: { some: { categoryId: { in: categoryIds } } } }
+      ];
+    }
+  }
+
+  // Fetch all matching APPROVED NGOs using Prisma
+  const candidates = await prisma.ngoProfile.findMany({
+    where,
     include: {
-      user: true,
       category: true,
-      documents: true
+      services: { include: { category: true } }
     }
   });
+
+  // State is a strict, case-insensitive filter
+  let stateFiltered = candidates;
+  if (state && state.trim()) {
+    const targetState = state.trim().toLowerCase();
+    stateFiltered = candidates.filter((ngo) => {
+      const geo = resolveCityCoordinates(ngo.city);
+      return (
+        geo.state.toLowerCase() === targetState ||
+        ngo.city.toLowerCase() === targetState
+      );
+    });
+  }
+
+  // City is a ranking preference only:
+  // Same city first, then emergencyAvailable, then newest
+  const targetCity = city && city.trim() ? city.trim().toLowerCase() : null;
+
+  const rankedNgos = [...stateFiltered].sort((a, b) => {
+    if (targetCity) {
+      const aSameCity = a.city?.trim().toLowerCase() === targetCity;
+      const bSameCity = b.city?.trim().toLowerCase() === targetCity;
+      if (aSameCity && !bSameCity) return -1;
+      if (!aSameCity && bSameCity) return 1;
+    }
+
+    if (a.emergencyAvailable !== b.emergencyAvailable) {
+      return a.emergencyAvailable ? -1 : 1;
+    }
+
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+
+  // Paginate ranked list
+  const total = rankedNgos.length;
+  const totalPages = Math.ceil(total / limitNum) || 1;
+  const skip = (pageNum - 1) * limitNum;
+  const pagedNgos = rankedNgos.slice(skip, skip + limitNum);
+
+  return {
+    data: pagedNgos,
+    pagination: {
+      page: pageNum,
+      limit: limitNum,
+      total,
+      totalPages
+    }
+  };
 };
 
 // NGO owner only: upload verification document
@@ -301,7 +453,8 @@ export const listMyDocuments = async (userId) => {
 
   return prisma.ngoDocument.findMany({
     where: { ngoProfileId: ngo.id },
-    orderBy: { createdAt: 'desc' }
+    orderBy: { createdAt: 'desc' },
+    take: 100
   });
 };
 
@@ -393,7 +546,8 @@ export const listDocumentsForAdmin = async (ngoId) => {
 
   return prisma.ngoDocument.findMany({
     where: { ngoProfileId: ngoId },
-    orderBy: { createdAt: 'desc' }
+    orderBy: { createdAt: 'desc' },
+    take: 100
   });
 };
 
@@ -402,6 +556,7 @@ export const listReviewsForAdmin = async (ngoId) => {
   return prisma.ngoVerificationReview.findMany({
     where: { ngoProfileId: ngoId },
     include: { reviewer: true },
-    orderBy: { createdAt: 'desc' }
+    orderBy: { createdAt: 'desc' },
+    take: 100
   });
 };

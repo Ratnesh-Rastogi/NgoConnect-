@@ -24,7 +24,17 @@ export const toAuthUser = (user) => {
           category: user.ngoProfile.category,
           verificationStatus: user.ngoProfile.verificationStatus,
           verificationNotes: user.ngoProfile.verificationNotes,
-          city: user.ngoProfile.city
+          description: user.ngoProfile.description,
+          contactPhone: user.ngoProfile.contactPhone,
+          address: user.ngoProfile.address,
+          city: user.ngoProfile.city,
+          publicEmail: user.ngoProfile.publicEmail,
+          publicPhone: user.ngoProfile.publicPhone,
+          whatsappNumber: user.ngoProfile.whatsappNumber,
+          website: user.ngoProfile.website,
+          facebookUrl: user.ngoProfile.facebookUrl,
+          instagramUrl: user.ngoProfile.instagramUrl,
+          showFullAddress: user.ngoProfile.showFullAddress
         }
       : null
   };

@@ -4,7 +4,8 @@ import { prisma } from './config/prisma.js';
 import { resolveCityCoordinates } from './utils/geo.js';
 import { saveFile } from './services/storageService.js';
 
-async function seed() {
+export async function seed(customPrisma) {
+  const db = customPrisma || prisma;
   if (process.env.NODE_ENV === 'production') {
     console.error('[Seed Error] Database seeding is strictly forbidden when NODE_ENV=production.');
     process.exit(1);
@@ -13,14 +14,17 @@ async function seed() {
   console.log('[Seed] Starting database seeding for NGOConnect AI...');
 
   // Clean existing records in correct foreign key relation order
-  await prisma.transfer.deleteMany();
-  await prisma.resource.deleteMany();
-  await prisma.resourceRequest.deleteMany();
-  await prisma.ngoVerificationReview.deleteMany();
-  await prisma.ngoDocument.deleteMany();
-  await prisma.ngoProfile.deleteMany();
-  await prisma.user.deleteMany();
-  await prisma.category.deleteMany();
+  await db.notification.deleteMany();
+  await db.transferEvent.deleteMany();
+  await db.transfer.deleteMany();
+  await db.resource.deleteMany();
+  await db.resourceRequest.deleteMany();
+  await db.ngoVerificationReview.deleteMany();
+  await db.ngoDocument.deleteMany();
+  await db.ngoService.deleteMany();
+  await db.ngoProfile.deleteMany();
+  await db.user.deleteMany();
+  await db.category.deleteMany();
 
   // 1. Seed Categories
   const categoryDefs = [
@@ -34,7 +38,7 @@ async function seed() {
 
   const categoryMap = {};
   for (const cat of categoryDefs) {
-    const created = await prisma.category.create({ data: cat });
+    const created = await db.category.create({ data: cat });
     categoryMap[cat.slug] = created.id;
   }
   console.log('[Seed] Categories seeded successfully.');
@@ -43,7 +47,7 @@ async function seed() {
   const commonPasswordHash = await bcrypt.hash('password123', salt);
 
   // 2. Create Admin
-  const admin = await prisma.user.create({
+  const admin = await db.user.create({
     data: {
       email: 'admin@ngoconnect.org',
       passwordHash: commonPasswordHash,
@@ -59,7 +63,7 @@ async function seed() {
       '%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF'
     );
     const storageKey = await saveFile(dummyPdfContent, originalName, 'application/pdf');
-    return prisma.ngoDocument.create({
+    return db.ngoDocument.create({
       data: {
         ngoProfileId,
         docType,
@@ -72,7 +76,7 @@ async function seed() {
   };
 
   // 3. Create Approved NGO 1: Hope Relief Foundation
-  const ngoUser1 = await prisma.user.create({
+  const ngoUser1 = await db.user.create({
     data: {
       email: 'hope@relief.org',
       passwordHash: commonPasswordHash,
@@ -81,7 +85,7 @@ async function seed() {
     }
   });
 
-  const ngoProfile1 = await prisma.ngoProfile.create({
+  const ngoProfile1 = await db.ngoProfile.create({
     data: {
       userId: ngoUser1.id,
       orgName: 'Hope Relief Foundation',
@@ -91,13 +95,30 @@ async function seed() {
       contactPhone: '+91 98110 12345',
       address: 'Plot 42, Vasant Kunj Sector C',
       city: 'New Delhi',
+      publicEmail: 'info@hoperelief-public.org',
+      publicPhone: '+91 98110 12345',
+      whatsappNumber: '+91 98110 12345',
+      website: 'https://hoperelief.org',
+      facebookUrl: 'https://facebook.com/hoperelief',
+      instagramUrl: 'https://instagram.com/hoperelief',
+      showFullAddress: true,
+      emergencyAvailable: true,
+      available24x7: true,
+      serviceAreaNote: '24/7 emergency rescue and disaster shelter across Delhi-NCR',
       verificationStatus: 'APPROVED',
       verificationNotes: 'Registered trust verified with official tax exemption certificate.'
     }
   });
+  await db.ngoService.createMany({
+    data: [
+      { ngoId: ngoProfile1.id, categoryId: categoryMap['shelter'] },
+      { ngoId: ngoProfile1.id, categoryId: categoryMap['healthcare'] },
+      { ngoId: ngoProfile1.id, categoryId: categoryMap['food-distribution'] }
+    ]
+  });
   await seedDocument(ngoProfile1.id, 'REGISTRATION_CERTIFICATE', 'hope_relief_trust_deed.pdf');
   await seedDocument(ngoProfile1.id, 'TAX_EXEMPTION_12A_80G', 'hope_relief_80g_exemption.pdf');
-  await prisma.ngoVerificationReview.create({
+  await db.ngoVerificationReview.create({
     data: {
       ngoProfileId: ngoProfile1.id,
       reviewerId: admin.id,
@@ -107,8 +128,8 @@ async function seed() {
     }
   });
 
-  // 4. Create Approved NGO 2: Clean Water & Health Initiative
-  const ngoUser2 = await prisma.user.create({
+  // 4. Create Approved NGO 2: Clean Water & Health Initiative (Patna, Bihar)
+  const ngoUser2 = await db.user.create({
     data: {
       email: 'cleanwater@health.org',
       passwordHash: commonPasswordHash,
@@ -117,7 +138,7 @@ async function seed() {
     }
   });
 
-  const ngoProfile2 = await prisma.ngoProfile.create({
+  const ngoProfile2 = await db.ngoProfile.create({
     data: {
       userId: ngoUser2.id,
       orgName: 'Clean Water & Health Initiative',
@@ -127,12 +148,28 @@ async function seed() {
       contactPhone: '+91 98350 54321',
       address: '14 Ganga Road',
       city: 'Patna',
+      publicEmail: 'support@cleanwater-public.org',
+      publicPhone: '+91 98350 54321',
+      whatsappNumber: '+91 98350 54321',
+      website: 'https://cleanwaterhealth.org',
+      facebookUrl: 'https://facebook.com/cleanwaterhealth',
+      instagramUrl: 'https://instagram.com/cleanwaterhealth',
+      showFullAddress: false,
+      emergencyAvailable: true,
+      available24x7: false,
+      serviceAreaNote: 'Emergency clean drinking water dispatch in Patna',
       verificationStatus: 'APPROVED',
       verificationNotes: 'Audited annual reports submitted and approved.'
     }
   });
+  await db.ngoService.createMany({
+    data: [
+      { ngoId: ngoProfile2.id, categoryId: categoryMap['healthcare'] },
+      { ngoId: ngoProfile2.id, categoryId: categoryMap['environmental-protection'] }
+    ]
+  });
   await seedDocument(ngoProfile2.id, 'REGISTRATION_CERTIFICATE', 'clean_water_society_reg.pdf');
-  await prisma.ngoVerificationReview.create({
+  await db.ngoVerificationReview.create({
     data: {
       ngoProfileId: ngoProfile2.id,
       reviewerId: admin.id,
@@ -142,8 +179,110 @@ async function seed() {
     }
   });
 
-  // 5. Create PENDING NGO 3: Sunshine Animal Sanctuary (appears in admin queue)
-  const ngoUser3 = await prisma.user.create({
+  // 5. Create Approved NGO 3: Mumbai Community Aid (Mumbai, Maharashtra)
+  const ngoUser3 = await db.user.create({
+    data: {
+      email: 'mumbai@aid.org',
+      passwordHash: commonPasswordHash,
+      name: 'Priya Sharma',
+      role: 'ngo'
+    }
+  });
+
+  const ngoProfile3 = await db.ngoProfile.create({
+    data: {
+      userId: ngoUser3.id,
+      orgName: 'Mumbai Community Aid',
+      regNumber: 'NGO-MUM-2023-3310',
+      description: 'Emergency food distribution, mobile pantry vans, and essentials for underprivileged families.',
+      categoryId: categoryMap['food-distribution'],
+      contactPhone: '+91 98200 11223',
+      address: '50 Andheri West Link Road',
+      city: 'Mumbai',
+      publicEmail: 'contact@mumbaiaid-public.org',
+      publicPhone: '+91 98200 11223',
+      whatsappNumber: '+91 98200 11223',
+      website: 'https://mumbaicommunityaid.org',
+      facebookUrl: 'https://facebook.com/mumbaicommunityaid',
+      instagramUrl: 'https://instagram.com/mumbaicommunityaid',
+      showFullAddress: true,
+      emergencyAvailable: true,
+      available24x7: false,
+      serviceAreaNote: 'Emergency community aid across Mumbai',
+      verificationStatus: 'APPROVED',
+      verificationNotes: 'Registered non-profit verified with tax exemption.'
+    }
+  });
+  await db.ngoService.createMany({
+    data: [
+      { ngoId: ngoProfile3.id, categoryId: categoryMap['food-distribution'] },
+      { ngoId: ngoProfile3.id, categoryId: categoryMap['shelter'] },
+      { ngoId: ngoProfile3.id, categoryId: categoryMap['clothing'] }
+    ]
+  });
+  await seedDocument(ngoProfile3.id, 'REGISTRATION_CERTIFICATE', 'mumbai_aid_reg.pdf');
+  await db.ngoVerificationReview.create({
+    data: {
+      ngoProfileId: ngoProfile3.id,
+      reviewerId: admin.id,
+      fromStatus: 'PENDING',
+      toStatus: 'APPROVED',
+      notes: 'Verified registration document.'
+    }
+  });
+
+  // 6. Create Approved NGO 4: Delhi Youth & Education Foundation (Second Delhi NGO WITHOUT emergency flags)
+  const ngoUser4 = await db.user.create({
+    data: {
+      email: 'delhiedu@youth.org',
+      passwordHash: commonPasswordHash,
+      name: 'Vikram Malhotra',
+      role: 'ngo'
+    }
+  });
+
+  const ngoProfile4 = await db.ngoProfile.create({
+    data: {
+      userId: ngoUser4.id,
+      orgName: 'Delhi Youth & Education Foundation',
+      regNumber: 'NGO-DEL-2023-5590',
+      description: 'Educational programs, literacy materials, and student mentoring for disadvantaged youth.',
+      categoryId: categoryMap['education'],
+      contactPhone: '+91 98119 87654',
+      address: '88 Connaught Place Outer Circle',
+      city: 'New Delhi',
+      publicEmail: 'contact@delhiedu-public.org',
+      publicPhone: '+91 98119 87654',
+      whatsappNumber: '+91 98119 87654',
+      website: 'https://delhiyouthfoundation.org',
+      facebookUrl: 'https://facebook.com/delhiyouthfoundation',
+      instagramUrl: 'https://instagram.com/delhiyouthfoundation',
+      showFullAddress: false,
+      emergencyAvailable: false,
+      available24x7: false,
+      serviceAreaNote: null,
+      verificationStatus: 'APPROVED',
+      verificationNotes: 'Verified registration document.'
+    }
+  });
+  await db.ngoService.createMany({
+    data: [
+      { ngoId: ngoProfile4.id, categoryId: categoryMap['education'] }
+    ]
+  });
+  await seedDocument(ngoProfile4.id, 'REGISTRATION_CERTIFICATE', 'delhi_youth_reg.pdf');
+  await db.ngoVerificationReview.create({
+    data: {
+      ngoProfileId: ngoProfile4.id,
+      reviewerId: admin.id,
+      fromStatus: 'PENDING',
+      toStatus: 'APPROVED',
+      notes: 'Educational foundation credentials verified.'
+    }
+  });
+
+  // 7. Create PENDING NGO 5: Sunshine Animal Sanctuary (appears in admin queue)
+  const ngoUser5 = await db.user.create({
     data: {
       email: 'sunshine@animals.org',
       passwordHash: commonPasswordHash,
@@ -152,9 +291,9 @@ async function seed() {
     }
   });
 
-  const ngoProfile3 = await prisma.ngoProfile.create({
+  const ngoProfile5 = await db.ngoProfile.create({
     data: {
-      userId: ngoUser3.id,
+      userId: ngoUser5.id,
       orgName: 'Sunshine Animal Sanctuary',
       regNumber: 'NGO-BLR-2024-1102',
       description: 'Rescuing and rehabilitating abandoned and injured street animals.',
@@ -166,11 +305,11 @@ async function seed() {
       verificationNotes: null
     }
   });
-  await seedDocument(ngoProfile3.id, 'REGISTRATION_CERTIFICATE', 'sunshine_animal_sanctuary_reg.pdf');
-  console.log(`[Seed] Seeded pending NGO with document for admin queue: ${ngoProfile3.orgName}`);
+  await seedDocument(ngoProfile5.id, 'REGISTRATION_CERTIFICATE', 'sunshine_animal_sanctuary_reg.pdf');
+  console.log(`[Seed] Seeded pending NGO with document for admin queue: ${ngoProfile5.orgName}`);
 
   // 6. Create Donor: Sarah Donor
-  const donorUser = await prisma.user.create({
+  const donorUser = await db.user.create({
     data: {
       email: 'donor@example.com',
       passwordHash: commonPasswordHash,
@@ -184,7 +323,7 @@ async function seed() {
   const delhiGeo = resolveCityCoordinates('New Delhi');
   const patnaGeo = resolveCityCoordinates('Patna');
 
-  const request1 = await prisma.resourceRequest.create({
+  const request1 = await db.resourceRequest.create({
     data: {
       ngoProfileId: ngoProfile1.id,
       title: 'Emergency Thermal Blankets for Winter Relief',
@@ -203,7 +342,7 @@ async function seed() {
     }
   });
 
-  const request2 = await prisma.resourceRequest.create({
+  const request2 = await db.resourceRequest.create({
     data: {
       ngoProfileId: ngoProfile1.id,
       title: 'Pediatric First-Aid & Essential Antibiotic Kits',
@@ -222,7 +361,7 @@ async function seed() {
     }
   });
 
-  const request3 = await prisma.resourceRequest.create({
+  const request3 = await db.resourceRequest.create({
     data: {
       ngoProfileId: ngoProfile2.id,
       title: 'Water Purification Tablets (Chlorine Tablets)',
@@ -245,7 +384,7 @@ async function seed() {
   const expiryDate1 = new Date();
   expiryDate1.setDate(expiryDate1.getDate() + 45); // 45 days in future
 
-  await prisma.resource.create({
+  await db.resource.create({
     data: {
       ownerId: donorUser.id,
       title: 'Dry Ration Food Kits (Rice, Pulses, Oil)',
@@ -266,7 +405,7 @@ async function seed() {
   const expiryDate2 = new Date();
   expiryDate2.setDate(expiryDate2.getDate() + 90);
 
-  await prisma.resource.create({
+  await db.resource.create({
     data: {
       ownerId: donorUser.id,
       title: 'Sterile Cotton Bandages & Antiseptic Wipes',
@@ -285,7 +424,7 @@ async function seed() {
   });
 
   // 9. Create sample transfer donation linked to request1
-  await prisma.transfer.create({
+  await db.transfer.create({
     data: {
       donorId: donorUser.id,
       ngoProfileId: ngoProfile1.id,
@@ -297,10 +436,17 @@ async function seed() {
   });
 
   console.log('[Seed] Seeding completed successfully!');
-  await prisma.$disconnect();
+  if (!customPrisma) {
+    await prisma.$disconnect();
+  }
 }
 
-seed().catch((e) => {
-  console.error('[Seed] Error during seeding:', e);
-  process.exit(1);
-});
+export default seed;
+
+if (process.argv[1] && process.argv[1].replace(/\\/g, '/').endsWith('seed.js')) {
+  seed().catch((e) => {
+    console.error('[Seed] Error during seeding:', e);
+    process.exit(1);
+  });
+}
+

@@ -364,7 +364,8 @@ export const listDonorTransfers = async (donorId) => {
   return prisma.transfer.findMany({
     where: { donorId },
     include: transferInclude,
-    orderBy: { createdAt: 'desc' }
+    orderBy: { createdAt: 'desc' },
+    take: 100
   });
 };
 
@@ -381,7 +382,8 @@ export const listNgoTransfers = async (userId) => {
   return prisma.transfer.findMany({
     where: { ngoProfileId: ngo.id },
     include: transferInclude,
-    orderBy: { createdAt: 'desc' }
+    orderBy: { createdAt: 'desc' },
+    take: 100
   });
 };
 

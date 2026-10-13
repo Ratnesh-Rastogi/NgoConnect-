@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
-import { LogIn, AlertCircle, Sparkles, Shield, Building2, User } from 'lucide-react';
+import { LogIn, AlertCircle } from 'lucide-react';
 
 export const LoginPage = ({ onNavigate }) => {
   const { login } = useAuth();
@@ -20,23 +20,6 @@ export const LoginPage = ({ onNavigate }) => {
       else onNavigate('donor-dashboard');
     } catch (err) {
       setError(err.message || 'Login failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDemoLogin = async (demoEmail) => {
-    setEmail(demoEmail);
-    setPassword('password123');
-    setError(null);
-    setLoading(true);
-    try {
-      const user = await login(demoEmail, 'password123');
-      if (user.role === 'admin') onNavigate('admin-dashboard');
-      else if (user.role === 'ngo') onNavigate('ngo-dashboard');
-      else onNavigate('donor-dashboard');
-    } catch (err) {
-      setError(err.message || 'Demo login failed');
     } finally {
       setLoading(false);
     }
@@ -95,50 +78,6 @@ export const LoginPage = ({ onNavigate }) => {
             {loading ? 'Authenticating...' : 'Sign In'}
           </button>
         </form>
-
-        {/* Demo Fast Login Pills */}
-        <div className="mt-8 pt-6 border-t border-gray-100">
-          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider text-center mb-3">
-            Quick Test Accounts (Seeded)
-          </p>
-          <div className="grid grid-cols-2 gap-2 text-[11px]">
-            <button
-              type="button"
-              onClick={() => handleDemoLogin('donor@example.com')}
-              className="p-2 rounded-xl border border-gray-200 hover:border-emerald-300 hover:bg-emerald-50 text-gray-700 font-medium flex items-center space-x-1.5 transition-all"
-            >
-              <User className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Sarah (Donor)</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleDemoLogin('hope@relief.org')}
-              className="p-2 rounded-xl border border-gray-200 hover:border-emerald-300 hover:bg-emerald-50 text-gray-700 font-medium flex items-center space-x-1.5 transition-all"
-            >
-              <Building2 className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Hope Relief (Approved)</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleDemoLogin('sunshine@animals.org')}
-              className="p-2 rounded-xl border border-amber-200 hover:bg-amber-50 text-amber-900 font-medium flex items-center space-x-1.5 transition-all"
-            >
-              <Building2 className="w-3.5 h-3.5 text-amber-600" />
-              <span>Sunshine (Pending)</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleDemoLogin('admin@ngoconnect.org')}
-              className="p-2 rounded-xl border border-gray-200 hover:border-purple-300 hover:bg-purple-50 text-gray-700 font-medium flex items-center space-x-1.5 transition-all"
-            >
-              <Shield className="w-3.5 h-3.5 text-purple-600" />
-              <span>Admin Oversight</span>
-            </button>
-          </div>
-        </div>
 
         <div className="mt-6 text-center text-xs text-gray-500">
           Don't have an account yet?{' '}

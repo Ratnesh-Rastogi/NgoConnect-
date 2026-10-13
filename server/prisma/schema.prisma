@@ -58,6 +58,7 @@ model Category {
   ngoProfiles      NgoProfile[]
   resourceRequests ResourceRequest[]
   resources        Resource[]
+  ngoServices      NgoService[]
 
   @@map("categories")
 }
@@ -98,12 +99,39 @@ model NgoProfile {
   createdAt           DateTime                @default(now())
   updatedAt           DateTime                @updatedAt
 
+  publicEmail         String?
+  publicPhone         String?
+  whatsappNumber      String?
+  website             String?
+  facebookUrl         String?
+  instagramUrl        String?
+  showFullAddress     Boolean                 @default(false)
+
+  // Emergency & Urgent Help fields
+  emergencyAvailable  Boolean                 @default(false)
+  available24x7       Boolean                 @default(false)
+  serviceAreaNote     String?
+
+  services            NgoService[]
   documents           NgoDocument[]
   verificationReviews NgoVerificationReview[]
   requests            ResourceRequest[]
   transfersReceived   Transfer[]              @relation("NgoTransfers")
 
   @@map("ngo_profiles")
+}
+
+model NgoService {
+  id         String     @id @default(uuid())
+  ngoId      String
+  categoryId String
+  createdAt  DateTime   @default(now())
+
+  ngo        NgoProfile @relation(fields: [ngoId], references: [id], onDelete: Cascade)
+  category   Category   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([ngoId, categoryId])
+  @@map("ngo_services")
 }
 
 model NgoDocument {

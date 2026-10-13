@@ -14,6 +14,19 @@ export const listApproved = async (req, res, next) => {
   }
 };
 
+// Public: urgent help search
+export const searchUrgent = async (req, res, next) => {
+  try {
+    const result = await ngoService.searchUrgentNgos(req.query);
+    res.status(200).json({
+      data: result.data.map(toPublicNgo),
+      pagination: result.pagination
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Public/Protected: get NGO details with safe mapper isolation
 export const getById = async (req, res, next) => {
   try {

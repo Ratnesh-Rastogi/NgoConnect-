@@ -5,6 +5,7 @@ import { StatusBadge } from '../components/StatusBadge.jsx';
 import { UrgencyBadge } from '../components/UrgencyBadge.jsx';
 import { RequestModal } from '../components/RequestModal.jsx';
 import { TransferTimeline } from '../components/TransferTimeline.jsx';
+import { buildWhatsAppLink } from '../utils/formatters.js';
 import {
   Building2,
   PlusCircle,
@@ -22,12 +23,22 @@ import {
   FileCheck,
   ArrowUpRight,
   TrendingUp,
-  BarChart2
+  BarChart2,
+  Phone,
+  Mail,
+  MessageCircle,
+  Globe,
+  Facebook,
+  Instagram,
+  Save,
+  Eye,
+  MapPin,
+  LifeBuoy
 } from 'lucide-react';
 
 export const NgoDashboard = () => {
   const { user, refreshProfile } = useAuth();
-  const [activeTab, setActiveTab] = useState('requests'); // 'requests' | 'transfers' | 'documents'
+  const [activeTab, setActiveTab] = useState('requests'); // 'requests' | 'transfers' | 'documents' | 'profile'
   const [requests, setRequests] = useState([]);
   const [transfers, setTransfers] = useState([]);
   const [documents, setDocuments] = useState([]);
@@ -42,6 +53,100 @@ export const NgoDashboard = () => {
   const [docSuccess, setDocSuccess] = useState(null);
   const [showRequestModal, setShowRequestModal] = useState(false);
   const fileInputRef = useRef(null);
+
+  // Available categories for service selection
+  const [availableCategories, setAvailableCategories] = useState([]);
+
+  // Profile & Contact Details State
+  const [profileForm, setProfileForm] = useState({
+    publicEmail: user?.ngoProfile?.publicEmail || '',
+    publicPhone: user?.ngoProfile?.publicPhone || '',
+    whatsappNumber: user?.ngoProfile?.whatsappNumber || '',
+    website: user?.ngoProfile?.website || '',
+    facebookUrl: user?.ngoProfile?.facebookUrl || '',
+    instagramUrl: user?.ngoProfile?.instagramUrl || '',
+    showFullAddress: Boolean(user?.ngoProfile?.showFullAddress),
+    orgName: user?.ngoProfile?.orgName || '',
+    description: user?.ngoProfile?.description || '',
+    category: user?.ngoProfile?.category || '',
+    city: user?.ngoProfile?.city || '',
+    state: user?.ngoProfile?.state || '',
+    address: user?.ngoProfile?.address || '',
+    emergencyAvailable: Boolean(user?.ngoProfile?.emergencyAvailable),
+    available24x7: Boolean(user?.ngoProfile?.available24x7),
+    serviceAreaNote: user?.ngoProfile?.serviceAreaNote || '',
+    serviceCategoryIds: user?.ngoProfile?.services ? user.ngoProfile.services.map((s) => s.id || s.categoryId) : []
+  });
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileError, setProfileError] = useState(null);
+  const [profileSuccess, setProfileSuccess] = useState(null);
+
+  useEffect(() => {
+    api
+      .get('/categories')
+      .then((res) => setAvailableCategories(res.data.data || []))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (user?.ngoProfile) {
+      setProfileForm({
+        publicEmail: user.ngoProfile.publicEmail || '',
+        publicPhone: user.ngoProfile.publicPhone || '',
+        whatsappNumber: user.ngoProfile.whatsappNumber || '',
+        website: user.ngoProfile.website || '',
+        facebookUrl: user.ngoProfile.facebookUrl || '',
+        instagramUrl: user.ngoProfile.instagramUrl || '',
+        showFullAddress: Boolean(user.ngoProfile.showFullAddress),
+        orgName: user.ngoProfile.orgName || '',
+        description: user.ngoProfile.description || '',
+        category: user.ngoProfile.category || '',
+        city: user.ngoProfile.city || '',
+        state: user.ngoProfile.state || '',
+        address: user.ngoProfile.address || '',
+        emergencyAvailable: Boolean(user.ngoProfile.emergencyAvailable),
+        available24x7: Boolean(user.ngoProfile.available24x7),
+        serviceAreaNote: user.ngoProfile.serviceAreaNote || '',
+        serviceCategoryIds: user.ngoProfile.services ? user.ngoProfile.services.map((s) => s.id || s.categoryId) : []
+      });
+    }
+  }, [user]);
+
+  const handleSaveProfile = async (e) => {
+    e.preventDefault();
+    setSavingProfile(true);
+    setProfileError(null);
+    setProfileSuccess(null);
+    try {
+      const payload = {
+        publicEmail: profileForm.publicEmail.trim() || null,
+        publicPhone: profileForm.publicPhone.trim() || null,
+        whatsappNumber: profileForm.whatsappNumber.trim() || null,
+        website: profileForm.website.trim() || null,
+        facebookUrl: profileForm.facebookUrl.trim() || null,
+        instagramUrl: profileForm.instagramUrl.trim() || null,
+        showFullAddress: Boolean(profileForm.showFullAddress),
+        emergencyAvailable: Boolean(profileForm.emergencyAvailable),
+        available24x7: Boolean(profileForm.available24x7),
+        serviceAreaNote: profileForm.serviceAreaNote.trim() || null,
+        serviceCategoryIds: profileForm.serviceCategoryIds || []
+      };
+      if (profileForm.orgName?.trim()) payload.orgName = profileForm.orgName.trim();
+      if (profileForm.description?.trim()) payload.description = profileForm.description.trim();
+      if (profileForm.category?.trim()) payload.category = profileForm.category.trim();
+      if (profileForm.city?.trim()) payload.city = profileForm.city.trim();
+      if (profileForm.state?.trim()) payload.state = profileForm.state.trim();
+      if (profileForm.address?.trim()) payload.address = profileForm.address.trim();
+
+      await api.put('/ngos/my/profile', payload);
+      setProfileSuccess('Contact details & organization profile saved successfully!');
+      await refreshProfile();
+    } catch (err) {
+      setProfileError(err.message || 'Failed to update contact details.');
+    } finally {
+      setSavingProfile(false);
+    }
+  };
 
   const verificationStatus = user?.ngoProfile?.verificationStatus || 'PENDING';
   const verificationNotes = user?.ngoProfile?.verificationNotes;
@@ -438,6 +543,18 @@ export const NgoDashboard = () => {
             <FileText className="w-4 h-4" />
             <span>Verification & Documents ({documents.length})</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab('profile')}
+            className={`pb-3 border-b-2 transition-all flex items-center space-x-1.5 ${
+              activeTab === 'profile'
+                ? 'border-emerald-600 text-emerald-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <Building2 className="w-4 h-4" />
+            <span>Contact Details & Profile</span>
+          </button>
         </nav>
       </div>
 
@@ -782,6 +899,562 @@ export const NgoDashboard = () => {
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 4: Contact Details & Profile */}
+      {activeTab === 'profile' && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* Left Column: Editor Form */}
+          <div className="lg:col-span-7 bg-white rounded-3xl border border-gray-200/80 shadow-sm p-6 sm:p-8 space-y-6">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-emerald-600" />
+                <span>Public Contact Channels & Profile</span>
+              </h2>
+              <p className="text-xs text-gray-500 mt-1">
+                Configure official contact channels and social links to make it easy for donors and partners to reach your team.
+              </p>
+            </div>
+
+            {/* Privacy notice banner */}
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs text-slate-700 space-y-1.5 leading-relaxed">
+              <div className="flex items-center gap-2 font-bold text-slate-900">
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                <span>Privacy & Separation of Credentials</span>
+              </div>
+              <p>
+                • Your public email and phone are strictly separate from your login credentials (<span className="font-mono text-emerald-700">{user?.email}</span>) and registration documents.
+              </p>
+              <p>
+                • Public contact details are displayed in the directory only once your organization has been <strong>APPROVED</strong>.
+              </p>
+              <p>
+                • You can choose below whether to reveal your full street address or keep it limited to city and state.
+              </p>
+            </div>
+
+            {profileSuccess && (
+              <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center space-x-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>{profileSuccess}</span>
+              </div>
+            )}
+
+            {profileError && (
+              <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center space-x-2">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>{profileError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveProfile} className="space-y-6">
+              {/* Public Contact Details Section */}
+              <div className="space-y-4">
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                  Public Contact Channels
+                </h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Public Official Email
+                    </label>
+                    <div className="relative">
+                      <Mail className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="email"
+                        value={profileForm.publicEmail}
+                        onChange={(e) => setProfileForm({ ...profileForm, publicEmail: e.target.value })}
+                        placeholder="e.g. info@hoperelief-public.org"
+                        maxLength={120}
+                        className="w-full text-xs pl-9 pr-3.5 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                      />
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-1">Click-to-email link. Max 120 characters.</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Public Contact Phone
+                    </label>
+                    <div className="relative">
+                      <Phone className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="tel"
+                        value={profileForm.publicPhone}
+                        onChange={(e) => setProfileForm({ ...profileForm, publicPhone: e.target.value })}
+                        placeholder="e.g. +91 98765 43210"
+                        maxLength={20}
+                        className="w-full text-xs pl-9 pr-3.5 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                      />
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-1">Click-to-call link. Digits, +, spaces, dashes (max 20).</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      WhatsApp Number
+                    </label>
+                    <div className="relative">
+                      <MessageCircle className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={profileForm.whatsappNumber}
+                        onChange={(e) => setProfileForm({ ...profileForm, whatsappNumber: e.target.value })}
+                        placeholder="e.g. 9876543210"
+                        maxLength={20}
+                        className="w-full text-xs pl-9 pr-3.5 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                      />
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-1">Auto-formats to wa.me (10 digits prefix 91).</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Official Website URL
+                    </label>
+                    <div className="relative">
+                      <Globe className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="url"
+                        value={profileForm.website}
+                        onChange={(e) => setProfileForm({ ...profileForm, website: e.target.value })}
+                        placeholder="https://example.org"
+                        maxLength={200}
+                        className="w-full text-xs pl-9 pr-3.5 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                      />
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-1">Must start with http:// or https:// (max 200).</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Facebook URL
+                    </label>
+                    <div className="relative">
+                      <Facebook className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="url"
+                        value={profileForm.facebookUrl}
+                        onChange={(e) => setProfileForm({ ...profileForm, facebookUrl: e.target.value })}
+                        placeholder="https://facebook.com/myngo"
+                        maxLength={200}
+                        className="w-full text-xs pl-9 pr-3.5 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                      />
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-1">Must start with http:// or https:// (max 200).</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Instagram URL
+                    </label>
+                    <div className="relative">
+                      <Instagram className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="url"
+                        value={profileForm.instagramUrl}
+                        onChange={(e) => setProfileForm({ ...profileForm, instagramUrl: e.target.value })}
+                        placeholder="https://instagram.com/myngo"
+                        maxLength={200}
+                        className="w-full text-xs pl-9 pr-3.5 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                      />
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-1">Must start with http:// or https:// (max 200).</p>
+                  </div>
+                </div>
+
+                {/* Show Full Address Toggle */}
+                <div className="pt-2">
+                  <label className="flex items-start space-x-3 cursor-pointer p-3 rounded-2xl border border-gray-200 bg-gray-50/50 hover:bg-gray-50 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={profileForm.showFullAddress}
+                      onChange={(e) => setProfileForm({ ...profileForm, showFullAddress: e.target.checked })}
+                      className="mt-0.5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <div className="text-xs">
+                      <span className="font-bold text-gray-900">Show Full Street Address Publicly</span>
+                      <p className="text-gray-500 text-[11px] mt-0.5">
+                        When checked, donors can view your full street address on directory cards. When unchecked, only your city and state are publicly revealed.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Urgent Help & Services Offered Section */}
+              <div className="space-y-4 pt-4 border-t border-gray-100">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <LifeBuoy className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Urgent Help & Services Offered</span>
+                  </h3>
+                  <span className="text-[11px] text-gray-400 font-medium">
+                    {profileForm.serviceCategoryIds.length} / 10 selected
+                  </span>
+                </div>
+
+                {/* Services multi-select chips */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                    Services / Help Types Offered
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {availableCategories.map((cat) => {
+                      const isSelected = profileForm.serviceCategoryIds.includes(cat.id);
+                      return (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => {
+                            if (isSelected) {
+                              setProfileForm({
+                                ...profileForm,
+                                serviceCategoryIds: profileForm.serviceCategoryIds.filter((id) => id !== cat.id)
+                              });
+                            } else {
+                              if (profileForm.serviceCategoryIds.length >= 10) {
+                                alert('You can select at most 10 services.');
+                                return;
+                              }
+                              setProfileForm({
+                                ...profileForm,
+                                serviceCategoryIds: [...profileForm.serviceCategoryIds, cat.id]
+                              });
+                            }
+                          }}
+                          className={`text-xs px-3 py-1.5 rounded-xl font-medium transition-all border ${
+                            isSelected
+                              ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                              : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                          }`}
+                        >
+                          {cat.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-1.5">
+                    These allow people in distress to discover your organization via the Urgent Help Finder.
+                  </p>
+                </div>
+
+                {/* Emergency Toggles */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <label className="flex items-start space-x-3 cursor-pointer p-3 rounded-2xl border border-gray-200 bg-gray-50/50 hover:bg-gray-50 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={profileForm.emergencyAvailable}
+                      onChange={(e) => setProfileForm({ ...profileForm, emergencyAvailable: e.target.checked })}
+                      className="mt-0.5 rounded border-gray-300 text-rose-600 focus:ring-rose-500"
+                    />
+                    <div className="text-xs">
+                      <span className="font-bold text-gray-900 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-rose-500 inline-block animate-pulse" />
+                        <span>Emergency Response Available</span>
+                      </span>
+                      <p className="text-gray-500 text-[11px] mt-0.5">
+                        Highlight your NGO on Urgent Help Finder for crisis and rapid response relief.
+                      </p>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start space-x-3 cursor-pointer p-3 rounded-2xl border border-gray-200 bg-gray-50/50 hover:bg-gray-50 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={profileForm.available24x7}
+                      onChange={(e) => setProfileForm({ ...profileForm, available24x7: e.target.checked })}
+                      className="mt-0.5 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                    />
+                    <div className="text-xs">
+                      <span className="font-bold text-gray-900 flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-amber-600" />
+                        <span>24/7 Helpline / Availability</span>
+                      </span>
+                      <p className="text-gray-500 text-[11px] mt-0.5">
+                        Indicates that phone or community response is reachable around the clock.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+
+                {/* Service Area Note */}
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="block text-xs font-semibold text-gray-700">
+                      Service Area / Coverage Note (Optional)
+                    </label>
+                    <span className="text-[10px] text-gray-400">
+                      {profileForm.serviceAreaNote.length} / 200
+                    </span>
+                  </div>
+                  <input
+                    type="text"
+                    maxLength={200}
+                    value={profileForm.serviceAreaNote}
+                    onChange={(e) => setProfileForm({ ...profileForm, serviceAreaNote: e.target.value })}
+                    placeholder="e.g. 24/7 rescue vans across Delhi-NCR and Faridabad border"
+                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    Specific neighborhoods, coverage areas, or operational instructions for beneficiaries.
+                  </p>
+                </div>
+              </div>
+
+              {/* Organization Profile Details */}
+              <div className="space-y-4 pt-4 border-t border-gray-100">
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                  Organization Information
+                </h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Organization Name</label>
+                    <input
+                      type="text"
+                      value={profileForm.orgName}
+                      onChange={(e) => setProfileForm({ ...profileForm, orgName: e.target.value })}
+                      className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Category</label>
+                    <input
+                      type="text"
+                      value={profileForm.category}
+                      onChange={(e) => setProfileForm({ ...profileForm, category: e.target.value })}
+                      className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Street Address</label>
+                    <input
+                      type="text"
+                      value={profileForm.address}
+                      onChange={(e) => setProfileForm({ ...profileForm, address: e.target.value })}
+                      placeholder="e.g. 104 Hope Enclave, MG Road"
+                      className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">City</label>
+                    <input
+                      type="text"
+                      value={profileForm.city}
+                      onChange={(e) => setProfileForm({ ...profileForm, city: e.target.value })}
+                      className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">State</label>
+                    <input
+                      type="text"
+                      value={profileForm.state}
+                      onChange={(e) => setProfileForm({ ...profileForm, state: e.target.value })}
+                      className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Description / Mission</label>
+                    <textarea
+                      rows={3}
+                      value={profileForm.description}
+                      onChange={(e) => setProfileForm({ ...profileForm, description: e.target.value })}
+                      className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-gray-100 flex justify-end">
+                <button
+                  type="submit"
+                  disabled={savingProfile}
+                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center space-x-2"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>{savingProfile ? 'Saving Details...' : 'Save Contact Details & Profile'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Right Column: Live Directory Preview */}
+          <div className="lg:col-span-5 space-y-4 lg:sticky lg:top-8">
+            <div className="flex items-center space-x-2 text-xs font-bold text-gray-700">
+              <Eye className="w-4 h-4 text-emerald-600" />
+              <span>Live Public Directory Preview</span>
+            </div>
+            <p className="text-[11px] text-gray-500">
+              Real-time representation of how donors and visitors see your organization card in the directory.
+            </p>
+
+            {/* Preview Card */}
+            <div className="bg-white rounded-2xl border border-gray-200/80 p-6 shadow-md transition-all space-y-4">
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-1.5">
+                  <span className="text-xs font-semibold px-2.5 py-0.5 rounded bg-gray-100 text-gray-700">
+                    {profileForm.category || 'Category'}
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {profileForm.emergencyAvailable && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                        <span>Emergency</span>
+                      </span>
+                    )}
+                    {profileForm.available24x7 && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                        <Clock className="w-3 h-3 text-amber-600" />
+                        <span>24/7</span>
+                      </span>
+                    )}
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                      <ShieldCheck className="w-3 h-3" />
+                      <span>Verified</span>
+                    </span>
+                  </div>
+                </div>
+
+                <h3 className="text-base font-bold text-gray-900 leading-snug">
+                  {profileForm.orgName || 'Your Organization Name'}
+                </h3>
+                <p className="text-xs text-gray-600 line-clamp-3 leading-relaxed">
+                  {profileForm.description || 'Your organization mission and relief goals will be displayed here.'}
+                </p>
+
+                {/* Services Tags & Coverage Note in Preview */}
+                {profileForm.serviceCategoryIds.length > 0 && (
+                  <div className="flex flex-wrap gap-1 pt-1">
+                    {availableCategories
+                      .filter((c) => profileForm.serviceCategoryIds.includes(c.id))
+                      .map((c) => (
+                        <span key={c.id} className="text-[10px] font-semibold bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-md">
+                          {c.name}
+                        </span>
+                      ))}
+                  </div>
+                )}
+
+                {profileForm.serviceAreaNote && (
+                  <p className="text-[11px] text-slate-600 italic bg-slate-50 p-2 rounded-xl border border-slate-100">
+                    Coverage: {profileForm.serviceAreaNote}
+                  </p>
+                )}
+
+                {/* Contact Action Badges */}
+                <div className="pt-2 border-t border-gray-100 flex flex-wrap gap-2">
+                  {profileForm.publicPhone && (
+                    <a
+                      href={`tel:${profileForm.publicPhone}`}
+                      title={`Call ${profileForm.publicPhone}`}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[11px] font-medium transition-colors"
+                    >
+                      <Phone className="w-3 h-3 text-emerald-600" />
+                      <span>{profileForm.publicPhone}</span>
+                    </a>
+                  )}
+
+                  {profileForm.publicEmail && (
+                    <a
+                      href={`mailto:${profileForm.publicEmail}`}
+                      title={`Email ${profileForm.publicEmail}`}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-800 text-[11px] font-medium transition-colors"
+                    >
+                      <Mail className="w-3 h-3 text-blue-600" />
+                      <span>{profileForm.publicEmail}</span>
+                    </a>
+                  )}
+
+                  {profileForm.whatsappNumber && (
+                    <a
+                      href={buildWhatsAppLink(profileForm.whatsappNumber)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="WhatsApp Chat"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-green-50 hover:bg-green-100 text-green-800 text-[11px] font-medium transition-colors"
+                    >
+                      <MessageCircle className="w-3 h-3 text-green-600" />
+                      <span>WhatsApp</span>
+                    </a>
+                  )}
+
+                  {profileForm.website && (
+                    <a
+                      href={profileForm.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={profileForm.website}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-800 text-[11px] font-medium transition-colors"
+                    >
+                      <Globe className="w-3 h-3 text-purple-600" />
+                      <span>Website</span>
+                    </a>
+                  )}
+
+                  {profileForm.facebookUrl && (
+                    <a
+                      href={profileForm.facebookUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Facebook Profile"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-800 text-[11px] font-medium transition-colors"
+                    >
+                      <Facebook className="w-3 h-3 text-sky-600" />
+                      <span>Facebook</span>
+                    </a>
+                  )}
+
+                  {profileForm.instagramUrl && (
+                    <a
+                      href={profileForm.instagramUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Instagram Profile"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-pink-50 hover:bg-pink-100 text-pink-800 text-[11px] font-medium transition-colors"
+                    >
+                      <Instagram className="w-3 h-3 text-pink-600" />
+                      <span>Instagram</span>
+                    </a>
+                  )}
+
+                  {!profileForm.publicPhone &&
+                    !profileForm.publicEmail &&
+                    !profileForm.whatsappNumber &&
+                    !profileForm.website &&
+                    !profileForm.facebookUrl &&
+                    !profileForm.instagramUrl && (
+                      <span className="text-[11px] text-gray-400 italic">
+                        No contact channels entered yet.
+                      </span>
+                    )}
+                </div>
+              </div>
+
+              {/* Location footer in preview */}
+              <div className="pt-4 mt-4 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
+                <span className="flex items-center gap-1 max-w-[75%] truncate">
+                  <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                  <span className="truncate">
+                    {profileForm.showFullAddress && profileForm.address
+                      ? `${profileForm.address}, ${profileForm.city || 'City'}${profileForm.state ? `, ${profileForm.state}` : ''}`
+                      : `${profileForm.city || 'City'}${profileForm.state ? `, ${profileForm.state}` : ''}`}
+                  </span>
+                </span>
+                <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded">
+                  {profileForm.showFullAddress ? 'Full Address' : 'City & State Only'}
+                </span>
+              </div>
             </div>
           </div>
         </div>
