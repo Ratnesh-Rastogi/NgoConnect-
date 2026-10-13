@@ -17,7 +17,7 @@ export const DonorDashboard = ({ onNavigate }) => {
       const res = await api.get('/transfers/my/donor');
       setTransfers(res.data.data || []);
     } catch (err) {
-      setError(err.message || 'Failed to load donation pledges');
+      setError(err.message || 'Failed to load donations');
     } finally {
       setLoading(false);
     }
@@ -53,7 +53,7 @@ export const DonorDashboard = ({ onNavigate }) => {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Donor Dashboard</h1>
           <p className="text-xs text-gray-500 mt-0.5">
-            Track and manage your resource pledges and shipment dispatches
+            Track and manage your resource donations and shipment dispatches
           </p>
         </div>
         <button
@@ -71,7 +71,7 @@ export const DonorDashboard = ({ onNavigate }) => {
             <Package className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-xs font-medium text-gray-500">Total Units Pledged</p>
+            <p className="text-xs font-medium text-gray-500">Total Units Donated</p>
             <p className="text-2xl font-extrabold text-gray-900">{totalPledged}</p>
           </div>
         </div>
@@ -100,7 +100,7 @@ export const DonorDashboard = ({ onNavigate }) => {
       {/* Transfers List */}
       <div className="bg-white rounded-3xl border border-gray-200/80 shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-          <h2 className="text-sm font-bold text-gray-900">Your Donation Pledges</h2>
+          <h2 className="text-sm font-bold text-gray-900">Your Donations</h2>
           <span className="text-xs text-gray-500">{transfers.length} records</span>
         </div>
 
@@ -119,12 +119,12 @@ export const DonorDashboard = ({ onNavigate }) => {
         ) : transfers.length === 0 ? (
           <div className="text-center py-16 space-y-3">
             <Package className="w-10 h-10 text-gray-300 mx-auto" />
-            <p className="text-sm font-semibold text-gray-700">You haven't pledged any resource donations yet.</p>
+            <p className="text-sm font-semibold text-gray-700">You haven't made any resource donations yet.</p>
             <button
               onClick={() => onNavigate('home')}
               className="text-xs font-bold text-emerald-700 hover:underline"
             >
-              Browse active requests to make your first pledge &rarr;
+              Browse active requests to make your first donation &rarr;
             </button>
           </div>
         ) : (
@@ -147,7 +147,7 @@ export const DonorDashboard = ({ onNavigate }) => {
                       </span>
                       <span>•</span>
                       <span>
-                        Pledged: <strong className="text-gray-900">{item.quantity}</strong> {item.request?.unit || 'units'}
+                        Donated: <strong className="text-gray-900">{item.quantity}</strong> {item.request?.unit || 'units'}
                       </span>
                       <span>•</span>
                       <span>{new Date(item.createdAt).toLocaleDateString()}</span>
@@ -212,13 +212,13 @@ export const DonorDashboard = ({ onNavigate }) => {
 
                         <button
                           onClick={() => {
-                            if (confirm('Cancel this donation pledge? Reserved quantity will be released back to the request.')) {
+                            if (confirm('Cancel this donation? Reserved quantity will be released back to the request.')) {
                               handleUpdateStatus(item.id, 'CANCELLED');
                             }
                           }}
                           className="px-3 py-1.5 bg-gray-100 hover:bg-rose-50 text-gray-600 hover:text-rose-600 rounded-xl text-xs font-semibold"
                         >
-                          Cancel Pledge
+                          Cancel Donation
                         </button>
                       </>
                     )}

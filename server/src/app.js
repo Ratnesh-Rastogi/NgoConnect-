@@ -8,6 +8,8 @@ import ngoRoutes from './routes/ngoRoutes.js';
 import requestRoutes from './routes/requestRoutes.js';
 import transferRoutes from './routes/transferRoutes.js';
 import aiRoutes from './routes/aiRoutes.js';
+import categoryRoutes from './routes/categoryRoutes.js';
+import resourceRoutes from './routes/resourceRoutes.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 
 const app = express();
@@ -49,6 +51,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/ngos', ngoRoutes);
 app.use('/api/requests', requestRoutes);
 app.use('/api/transfers', transferRoutes);
+app.use('/api/categories', categoryRoutes);
+app.use('/api/resources', resourceRoutes);
 app.use('/api/ai', aiRoutes);
 
 // 404 handler for unmatched routes conforming to { error: message }

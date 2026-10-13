@@ -49,7 +49,7 @@ describe('Resource Request Quantity Reservation Logic', () => {
     }
   });
 
-  it('reserves quantity when donor pledges a valid transfer', async () => {
+  it('reserves quantity when donor makes a valid donation', async () => {
     const res = await request(app)
       .post('/api/transfers')
       .set('Authorization', `Bearer ${donorToken}`)
@@ -72,8 +72,8 @@ describe('Resource Request Quantity Reservation Logic', () => {
     expect(updatedRequest.quantityFulfilled).toBe(0);
   });
 
-  it('rejects reservation when pledge exceeds remaining unreserved quantity', async () => {
-    // 50 needed - 20 reserved = 30 remaining. Pledging 35 must fail.
+  it('rejects reservation when donation exceeds remaining unreserved quantity', async () => {
+    // 50 needed - 20 reserved = 30 remaining. Donating 35 must fail.
     const res = await request(app)
       .post('/api/transfers')
       .set('Authorization', `Bearer ${donorToken}`)
@@ -98,17 +98,20 @@ describe('Resource Request Quantity Reservation Logic', () => {
       where: { verificationStatus: 'PENDING' }
     });
 
-    // Create a dummy request directly in DB to simulate an unapproved scenario
+    const sampleCategory = await prisma.category.findFirst();
     const invalidRequest = await prisma.resourceRequest.create({
       data: {
         ngoProfileId: pendingNgo.id,
         title: 'Unapproved Request',
         description: 'Should not receive donations',
-        category: 'Animal Welfare',
+        categoryId: sampleCategory.id,
         urgency: 'LOW',
         quantityNeeded: 10,
         unit: 'bags',
-        location: 'Bengaluru'
+        city: 'Bengaluru',
+        state: 'Karnataka',
+        latitude: 12.9716,
+        longitude: 77.5946
       }
     });
 

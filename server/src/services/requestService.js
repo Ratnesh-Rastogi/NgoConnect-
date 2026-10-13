@@ -1,5 +1,6 @@
 import { prisma } from '../config/prisma.js';
 import { AppError } from '../errors/AppError.js';
+import { resolveCityCoordinates } from '../utils/geo.js';
 
 // Create a resource request (Only APPROVED NGOs)
 export const createRequest = async (user, data) => {
@@ -23,23 +24,80 @@ export const createRequest = async (user, data) => {
     );
   }
 
+  // Resolve category ID from categoryId or category string
+  let categoryId = data.categoryId;
+  if (!categoryId && data.category) {
+    let matchedCategory = await prisma.category.findFirst({
+      where: {
+        OR: [
+          { id: data.category },
+          { slug: data.category.toLowerCase().replace(/\s+/g, '-') },
+          { name: { equals: data.category, mode: 'insensitive' } }
+        ]
+      }
+    });
+
+    if (!matchedCategory) {
+      const catLower = data.category.toLowerCase();
+      if (catLower.includes('food')) {
+        matchedCategory = await prisma.category.findFirst({ where: { slug: 'food-distribution' } });
+      } else if (catLower.includes('med') || catLower.includes('health')) {
+        matchedCategory = await prisma.category.findFirst({ where: { slug: 'healthcare' } });
+      } else if (catLower.includes('edu')) {
+        matchedCategory = await prisma.category.findFirst({ where: { slug: 'education' } });
+      } else if (catLower.includes('env')) {
+        matchedCategory = await prisma.category.findFirst({ where: { slug: 'environmental-protection' } });
+      } else if (catLower.includes('cloth')) {
+        matchedCategory = await prisma.category.findFirst({ where: { slug: 'clothing' } });
+      } else if (catLower.includes('shelt')) {
+        matchedCategory = await prisma.category.findFirst({ where: { slug: 'shelter' } });
+      } else {
+        matchedCategory = await prisma.category.findFirst({
+          where: {
+            OR: [
+              { name: { contains: data.category, mode: 'insensitive' } },
+              { slug: { contains: data.category, mode: 'insensitive' } }
+            ]
+          }
+        });
+      }
+    }
+
+    if (matchedCategory) {
+      categoryId = matchedCategory.id;
+    }
+  }
+
+  if (!categoryId) {
+    throw new AppError('Invalid category ID or name', 400);
+  }
+
+  const cityName = data.city || data.location || ngoProfile.city || 'New Delhi';
+  const geo = resolveCityCoordinates(cityName, data.state, data.latitude, data.longitude);
+
   return prisma.resourceRequest.create({
     data: {
       ngoProfileId: ngoProfile.id,
       title: data.title,
       description: data.description,
-      category: data.category,
+      categoryId,
       urgency: data.urgency || 'MEDIUM',
       quantityNeeded: data.quantityNeeded,
       unit: data.unit,
-      location: data.location,
+      city: geo.city,
+      state: geo.state,
+      latitude: geo.latitude,
+      longitude: geo.longitude,
       status: 'OPEN'
     },
-    include: { ngoProfile: true }
+    include: {
+      ngoProfile: true,
+      category: true
+    }
   });
 };
 
-// Public listing with filtering for category, urgency, status, and search keyword
+// Public listing with filtering for category, urgency, status, city, and search keyword
 export const listRequests = async (filters = {}) => {
   const where = {};
 
@@ -50,16 +108,28 @@ export const listRequests = async (filters = {}) => {
     where.status = { in: ['OPEN', 'PARTIAL'] };
   }
 
-  if (filters.category) {
-    where.category = { contains: filters.category, mode: 'insensitive' };
+  if (filters.categoryId) {
+    where.categoryId = filters.categoryId;
+  } else if (filters.category) {
+    where.category = {
+      OR: [
+        { name: { contains: filters.category, mode: 'insensitive' } },
+        { slug: { contains: filters.category, mode: 'insensitive' } }
+      ]
+    };
   }
 
   if (filters.urgency) {
     where.urgency = filters.urgency;
   }
 
-  if (filters.location) {
-    where.location = { contains: filters.location, mode: 'insensitive' };
+  if (filters.city) {
+    where.city = { contains: filters.city, mode: 'insensitive' };
+  } else if (filters.location) {
+    where.OR = [
+      { city: { contains: filters.location, mode: 'insensitive' } },
+      { state: { contains: filters.location, mode: 'insensitive' } }
+    ];
   }
 
   if (filters.ngoId) {
@@ -76,7 +146,8 @@ export const listRequests = async (filters = {}) => {
   return prisma.resourceRequest.findMany({
     where,
     include: {
-      ngoProfile: true
+      ngoProfile: true,
+      category: true
     },
     orderBy: [
       { urgency: 'desc' },
@@ -91,6 +162,7 @@ export const getRequestById = async (id) => {
     where: { id },
     include: {
       ngoProfile: true,
+      category: true,
       transfers: {
         include: { donor: true },
         orderBy: { createdAt: 'desc' }
@@ -124,19 +196,59 @@ export const updateRequest = async (user, requestId, data) => {
     throw new AppError('Forbidden: You can only modify your own resource requests', 403);
   }
 
+  let categoryId = existing.categoryId;
+  if (data.categoryId) {
+    categoryId = data.categoryId;
+  } else if (data.category) {
+    const matchedCategory = await prisma.category.findFirst({
+      where: {
+        OR: [
+          { id: data.category },
+          { slug: data.category.toLowerCase().replace(/\s+/g, '-') },
+          { name: { equals: data.category, mode: 'insensitive' } }
+        ]
+      }
+    });
+    if (matchedCategory) {
+      categoryId = matchedCategory.id;
+    }
+  }
+
+  let geo = {
+    city: existing.city,
+    state: existing.state,
+    latitude: existing.latitude,
+    longitude: existing.longitude
+  };
+
+  if (data.city || data.location) {
+    geo = resolveCityCoordinates(
+      data.city || data.location,
+      data.state,
+      data.latitude,
+      data.longitude
+    );
+  }
+
   return prisma.resourceRequest.update({
     where: { id: requestId },
     data: {
       title: data.title ?? existing.title,
       description: data.description ?? existing.description,
-      category: data.category ?? existing.category,
+      categoryId,
       urgency: data.urgency ?? existing.urgency,
       quantityNeeded: data.quantityNeeded ?? existing.quantityNeeded,
       unit: data.unit ?? existing.unit,
-      location: data.location ?? existing.location,
+      city: geo.city,
+      state: geo.state,
+      latitude: geo.latitude,
+      longitude: geo.longitude,
       status: data.status ?? existing.status
     },
-    include: { ngoProfile: true }
+    include: {
+      ngoProfile: true,
+      category: true
+    }
   });
 };
 
@@ -176,6 +288,7 @@ export const listMyNgoRequests = async (userId) => {
   return prisma.resourceRequest.findMany({
     where: { ngoProfileId: ngo.id },
     include: {
+      category: true,
       transfers: {
         include: { donor: true },
         orderBy: { createdAt: 'desc' }

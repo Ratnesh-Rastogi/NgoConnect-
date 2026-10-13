@@ -104,7 +104,7 @@ export const RequestCard = ({ request, onPledge, isOwner = false }) => {
                 : 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.99] shadow-sm shadow-emerald-200'
             }`}
           >
-            <span>{isClosed ? 'Request Fully Allocated' : 'Pledge Donation'}</span>
+            <span>{isClosed ? 'Request Fully Allocated' : 'Donate'}</span>
           </button>
         )}
       </div>

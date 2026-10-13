@@ -1,8 +1,9 @@
 import { toPublicNgo } from './ngoMapper.js';
 import { toPublicRequest } from './requestMapper.js';
 import { toSafeUser } from './userMapper.js';
+import { toPublicResource } from './resourceMapper.js';
 
-// Safe representation of a donation transfer / pledge
+// Safe representation of a donation transfer
 export const toSafeTransfer = (transfer) => {
   if (!transfer) return null;
   return {
@@ -11,11 +12,14 @@ export const toSafeTransfer = (transfer) => {
     status: transfer.status,
     donorNote: transfer.donorNote,
     trackingInfo: transfer.trackingInfo,
+    requestId: transfer.requestId,
+    resourceId: transfer.resourceId,
     receivedAt: transfer.receivedAt,
     createdAt: transfer.createdAt,
     updatedAt: transfer.updatedAt,
     donor: transfer.donor ? toSafeUser(transfer.donor) : undefined,
     request: transfer.request ? toPublicRequest(transfer.request) : undefined,
+    resource: transfer.resource ? toPublicResource(transfer.resource) : undefined,
     ngo: transfer.ngoProfile ? toPublicNgo(transfer.ngoProfile) : undefined
   };
 };

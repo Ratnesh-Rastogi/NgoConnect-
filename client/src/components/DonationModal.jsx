@@ -37,7 +37,7 @@ export const DonationModal = ({ request, onClose, onSuccess }) => {
       });
       onSuccess?.();
     } catch (err) {
-      setError(err.message || 'Failed to submit donation pledge');
+      setError(err.message || 'Failed to submit donation');
     } finally {
       setLoading(false);
     }
@@ -52,7 +52,7 @@ export const DonationModal = ({ request, onClose, onSuccess }) => {
             <div className="p-1.5 rounded-lg bg-emerald-100 text-emerald-700">
               <Heart className="w-4 h-4 fill-emerald-600" />
             </div>
-            <h2 className="font-bold text-gray-900 text-base">Pledge Resource Donation</h2>
+            <h2 className="font-bold text-gray-900 text-base">Donate to this request</h2>
           </div>
           <button
             onClick={onClose}
@@ -87,7 +87,7 @@ export const DonationModal = ({ request, onClose, onSuccess }) => {
 
           <div>
             <label className="block text-xs font-semibold text-gray-700 mb-1">
-              Pledged Quantity ({request.unit}) *
+              Donated Quantity ({request.unit}) *
             </label>
             <input
               type="number"
@@ -129,7 +129,7 @@ export const DonationModal = ({ request, onClose, onSuccess }) => {
               disabled={loading || remaining <= 0}
               className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-200 transition-all disabled:opacity-50"
             >
-              {loading ? 'Submitting Pledge...' : 'Confirm Pledge'}
+              {loading ? 'Submitting Donation...' : 'Confirm Donation'}
             </button>
           </div>
         </form>

@@ -52,7 +52,7 @@ export const HomePage = ({ onNavigate }) => {
       return;
     }
     if (user.role !== 'donor') {
-      alert('Only registered Donors can pledge resource transfers. Please sign in as a donor.');
+      alert('Only registered Donors can make resource donations. Please sign in as a donor.');
       return;
     }
     setPledgeTarget(request);
@@ -181,7 +181,7 @@ export const HomePage = ({ onNavigate }) => {
           onSuccess={() => {
             setPledgeTarget(null);
             fetchRequests();
-            alert('Your donation pledge was recorded successfully! Real-time quantity has been reserved.');
+            alert('Your donation was recorded successfully! Real-time quantity has been reserved.');
           }}
         />
       )}

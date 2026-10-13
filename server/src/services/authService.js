@@ -36,13 +36,33 @@ export const registerUser = async (data) => {
         throw new AppError('An NGO with this registration number already exists.', 409);
       }
 
+      let categoryId = data.categoryId;
+      if (!categoryId && data.category) {
+        const cat = await tx.category.findFirst({
+          where: {
+            OR: [
+              { id: data.category },
+              { slug: data.category.toLowerCase().replace(/\s+/g, '-') },
+              { name: { contains: data.category, mode: 'insensitive' } }
+            ]
+          }
+        });
+        if (cat) {
+          categoryId = cat.id;
+        }
+      }
+      if (!categoryId) {
+        const defaultCat = await tx.category.findFirst();
+        categoryId = defaultCat?.id;
+      }
+
       await tx.ngoProfile.create({
         data: {
           userId: user.id,
           orgName: data.orgName,
           regNumber: data.regNumber,
           description: data.description,
-          category: data.category,
+          categoryId,
           contactPhone: data.contactPhone,
           address: data.address,
           city: data.city,

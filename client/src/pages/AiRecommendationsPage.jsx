@@ -16,7 +16,7 @@ export const AiRecommendationsPage = ({ onNavigate }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Selected request for donation pledge
+  // Selected request for donation
   const [pledgeTarget, setPledgeTarget] = useState(null);
 
   const handleMatch = async (e) => {
@@ -49,7 +49,7 @@ export const AiRecommendationsPage = ({ onNavigate }) => {
       return;
     }
     if (user.role !== 'donor') {
-      alert('Only registered Donors can pledge resource transfers.');
+      alert('Only registered Donors can make resource donations.');
       return;
     }
     setPledgeTarget(req);
@@ -218,7 +218,7 @@ export const AiRecommendationsPage = ({ onNavigate }) => {
                       onClick={() => handlePledgeClick(req)}
                       className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm shadow-emerald-200 flex items-center space-x-1.5 transition-all"
                     >
-                      <span>Pledge Supplies</span>
+                      <span>Donate</span>
                       <ArrowRight className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -236,7 +236,7 @@ export const AiRecommendationsPage = ({ onNavigate }) => {
           onClose={() => setPledgeTarget(null)}
           onSuccess={() => {
             setPledgeTarget(null);
-            alert('Donation pledge registered! Reserved in real time.');
+            alert('Donation registered! Reserved in real time.');
           }}
         />
       )}

@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import bcrypt from 'bcryptjs';
 import { prisma } from './config/prisma.js';
+import { resolveCityCoordinates } from './utils/geo.js';
 
 async function seed() {
   if (process.env.NODE_ENV === 'production') {
@@ -10,16 +11,35 @@ async function seed() {
 
   console.log('[Seed] Starting database seeding for NGOConnect AI...');
 
-  // Clean existing records in correct relation order
+  // Clean existing records in correct foreign key relation order
   await prisma.transfer.deleteMany();
+  await prisma.resource.deleteMany();
   await prisma.resourceRequest.deleteMany();
   await prisma.ngoProfile.deleteMany();
   await prisma.user.deleteMany();
+  await prisma.category.deleteMany();
+
+  // 1. Seed Categories
+  const categoryDefs = [
+    { name: 'Education', slug: 'education' },
+    { name: 'Healthcare', slug: 'healthcare' },
+    { name: 'Food Distribution', slug: 'food-distribution' },
+    { name: 'Environmental Protection', slug: 'environmental-protection' },
+    { name: 'Clothing', slug: 'clothing' },
+    { name: 'Shelter', slug: 'shelter' }
+  ];
+
+  const categoryMap = {};
+  for (const cat of categoryDefs) {
+    const created = await prisma.category.create({ data: cat });
+    categoryMap[cat.slug] = created.id;
+  }
+  console.log('[Seed] Categories seeded successfully.');
 
   const salt = await bcrypt.genSalt(10);
   const commonPasswordHash = await bcrypt.hash('password123', salt);
 
-  // 1. Create Admin
+  // 2. Create Admin
   const admin = await prisma.user.create({
     data: {
       email: 'admin@ngoconnect.org',
@@ -30,7 +50,7 @@ async function seed() {
   });
   console.log(`[Seed] Created admin: ${admin.email}`);
 
-  // 2. Create Approved NGO 1: Hope Relief Foundation
+  // 3. Create Approved NGO 1: Hope Relief Foundation
   const ngoUser1 = await prisma.user.create({
     data: {
       email: 'hope@relief.org',
@@ -46,7 +66,7 @@ async function seed() {
       orgName: 'Hope Relief Foundation',
       regNumber: 'NGO-DEL-2022-0941',
       description: 'Dedicated to rapid disaster relief, emergency medical aid, and shelter assistance across northern regions.',
-      category: 'Disaster Relief',
+      categoryId: categoryMap['shelter'],
       contactPhone: '+91 98110 12345',
       address: 'Plot 42, Vasant Kunj Sector C',
       city: 'New Delhi',
@@ -55,7 +75,7 @@ async function seed() {
     }
   });
 
-  // 3. Create Approved NGO 2: Clean Water & Health Initiative
+  // 4. Create Approved NGO 2: Clean Water & Health Initiative
   const ngoUser2 = await prisma.user.create({
     data: {
       email: 'cleanwater@health.org',
@@ -71,7 +91,7 @@ async function seed() {
       orgName: 'Clean Water & Health Initiative',
       regNumber: 'NGO-PAT-2021-4820',
       description: 'Providing clean drinking water access, mobile purification kits, and water sanitation hygiene education.',
-      category: 'Healthcare',
+      categoryId: categoryMap['healthcare'],
       contactPhone: '+91 98350 54321',
       address: '14 Ganga Road',
       city: 'Patna',
@@ -80,7 +100,7 @@ async function seed() {
     }
   });
 
-  // 4. Create PENDING NGO 3: Sunshine Animal Sanctuary (For testing admin approval)
+  // 5. Create PENDING NGO 3: Sunshine Animal Sanctuary
   const ngoUser3 = await prisma.user.create({
     data: {
       email: 'sunshine@animals.org',
@@ -96,7 +116,7 @@ async function seed() {
       orgName: 'Sunshine Animal Sanctuary',
       regNumber: 'NGO-BLR-2024-1102',
       description: 'Rescuing and rehabilitating abandoned and injured street animals.',
-      category: 'Animal Welfare',
+      categoryId: categoryMap['environmental-protection'],
       contactPhone: '+91 99000 88776',
       address: '22 Whitefield Main Rd',
       city: 'Bengaluru',
@@ -105,7 +125,7 @@ async function seed() {
     }
   });
 
-  // 5. Create Donor: Sarah Donor
+  // 6. Create Donor: Sarah Donor
   const donorUser = await prisma.user.create({
     data: {
       email: 'donor@example.com',
@@ -116,19 +136,25 @@ async function seed() {
   });
   console.log(`[Seed] Created donor: ${donorUser.email}`);
 
-  // 6. Create Resource Requests for Approved NGOs
+  // 7. Create Resource Requests with geographic coordinates
+  const delhiGeo = resolveCityCoordinates('New Delhi');
+  const patnaGeo = resolveCityCoordinates('Patna');
+
   const request1 = await prisma.resourceRequest.create({
     data: {
       ngoProfileId: ngoProfile1.id,
       title: 'Emergency Thermal Blankets for Winter Relief',
       description: 'Cold wave relief drive for homeless families and seasonal migrant workers in outer Delhi.',
-      category: 'Shelter',
+      categoryId: categoryMap['shelter'],
       urgency: 'CRITICAL',
       quantityNeeded: 200,
       quantityFulfilled: 0,
       quantityReserved: 50,
       unit: 'blankets',
-      location: 'New Delhi',
+      city: delhiGeo.city,
+      state: delhiGeo.state,
+      latitude: delhiGeo.latitude,
+      longitude: delhiGeo.longitude,
       status: 'OPEN'
     }
   });
@@ -138,13 +164,16 @@ async function seed() {
       ngoProfileId: ngoProfile1.id,
       title: 'Pediatric First-Aid & Essential Antibiotic Kits',
       description: 'Urgent medical supplies required for flood-affected primary health clinics.',
-      category: 'Medical',
+      categoryId: categoryMap['healthcare'],
       urgency: 'HIGH',
       quantityNeeded: 60,
       quantityFulfilled: 0,
       quantityReserved: 0,
       unit: 'medical kits',
-      location: 'New Delhi',
+      city: delhiGeo.city,
+      state: delhiGeo.state,
+      latitude: delhiGeo.latitude,
+      longitude: delhiGeo.longitude,
       status: 'OPEN'
     }
   });
@@ -154,18 +183,64 @@ async function seed() {
       ngoProfileId: ngoProfile2.id,
       title: 'Water Purification Tablets (Chlorine Tablets)',
       description: 'Chlorine purification tablets to distribute across 12 villages facing contaminated groundwater.',
-      category: 'Healthcare',
+      categoryId: categoryMap['healthcare'],
       urgency: 'HIGH',
       quantityNeeded: 500,
       quantityFulfilled: 100,
       quantityReserved: 0,
       unit: 'strip packs',
-      location: 'Patna',
+      city: patnaGeo.city,
+      state: patnaGeo.state,
+      latitude: patnaGeo.latitude,
+      longitude: patnaGeo.longitude,
       status: 'PARTIAL'
     }
   });
 
-  // 7. Create a sample initial transfer
+  // 8. Create sample donor available resources
+  const expiryDate1 = new Date();
+  expiryDate1.setDate(expiryDate1.getDate() + 45); // 45 days in future
+
+  await prisma.resource.create({
+    data: {
+      ownerId: donorUser.id,
+      title: 'Dry Ration Food Kits (Rice, Pulses, Oil)',
+      description: 'Sealed pre-packaged food relief boxes suitable for family assistance.',
+      categoryId: categoryMap['food-distribution'],
+      quantityTotal: 120,
+      quantityAvailable: 120,
+      unit: 'kits',
+      expiryDate: expiryDate1,
+      city: delhiGeo.city,
+      state: delhiGeo.state,
+      latitude: delhiGeo.latitude,
+      longitude: delhiGeo.longitude,
+      status: 'ACTIVE'
+    }
+  });
+
+  const expiryDate2 = new Date();
+  expiryDate2.setDate(expiryDate2.getDate() + 90);
+
+  await prisma.resource.create({
+    data: {
+      ownerId: donorUser.id,
+      title: 'Sterile Cotton Bandages & Antiseptic Wipes',
+      description: 'Surplus clinic inventory donated from certified medical distributor.',
+      categoryId: categoryMap['healthcare'],
+      quantityTotal: 200,
+      quantityAvailable: 200,
+      unit: 'boxes',
+      expiryDate: expiryDate2,
+      city: delhiGeo.city,
+      state: delhiGeo.state,
+      latitude: delhiGeo.latitude,
+      longitude: delhiGeo.longitude,
+      status: 'ACTIVE'
+    }
+  });
+
+  // 9. Create sample transfer donation linked to request1
   await prisma.transfer.create({
     data: {
       donorId: donorUser.id,

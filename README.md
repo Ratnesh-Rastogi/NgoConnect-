@@ -42,7 +42,7 @@ npm test
 Runs 20 automated integration tests covering:
 - **Auth**: Registration, JWT tokens, duplicate email rejection, password hashing.
 - **Permissions & Roles**: Visitor read-only access, unapproved NGO restrictions, admin-only verification updates, ownership checks.
-- **Quantity Reservation**: Atomic reservation on pledge, cap enforcement, over-reservation prevention.
+- **Quantity Reservation**: Atomic reservation on donation, cap enforcement, over-reservation prevention.
 - **Transfer Transitions**: Full lifecycle `PENDING` -> `IN_TRANSIT` -> `RECEIVED` / `CANCELLED`, quantity release on cancellation.
 
 ---

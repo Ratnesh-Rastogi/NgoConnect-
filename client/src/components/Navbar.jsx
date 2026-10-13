@@ -35,6 +35,14 @@ export const Navbar = ({ currentView, setCurrentView }) => {
               Browse Needs
             </button>
             <button
+              onClick={() => setCurrentView('browse-resources')}
+              className={`px-3 py-2 rounded-lg transition-colors ${
+                currentView === 'browse-resources' ? 'text-emerald-700 bg-emerald-50 font-semibold' : 'hover:text-gray-900 hover:bg-gray-100'
+              }`}
+            >
+              Available Donations
+            </button>
+            <button
               onClick={() => setCurrentView('ngos')}
               className={`px-3 py-2 rounded-lg transition-colors ${
                 currentView === 'ngos' ? 'text-emerald-700 bg-emerald-50 font-semibold' : 'hover:text-gray-900 hover:bg-gray-100'
@@ -59,32 +67,56 @@ export const Navbar = ({ currentView, setCurrentView }) => {
               <div className="flex items-center space-x-3">
                 {/* Role-Specific Dashboard Shortcut */}
                 {user.role === 'donor' && (
-                  <button
-                    onClick={() => setCurrentView('donor-dashboard')}
-                    className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-all ${
-                      currentView === 'donor-dashboard'
-                        ? 'bg-emerald-600 text-white shadow'
-                        : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                    }`}
-                  >
-                    My Donations
-                  </button>
+                  <>
+                    <button
+                      onClick={() => setCurrentView('donor-dashboard')}
+                      className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-all ${
+                        currentView === 'donor-dashboard'
+                          ? 'bg-emerald-600 text-white shadow'
+                          : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                      }`}
+                    >
+                      My Donations
+                    </button>
+                    <button
+                      onClick={() => setCurrentView('my-resources')}
+                      className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-all ${
+                        currentView === 'my-resources'
+                          ? 'bg-emerald-600 text-white shadow'
+                          : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                      }`}
+                    >
+                      My Listings
+                    </button>
+                  </>
                 )}
 
                 {user.role === 'ngo' && (
-                  <button
-                    onClick={() => setCurrentView('ngo-dashboard')}
-                    className={`text-xs px-3 py-1.5 rounded-lg font-semibold flex items-center space-x-1.5 transition-all ${
-                      currentView === 'ngo-dashboard'
-                        ? 'bg-emerald-600 text-white shadow'
-                        : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                    }`}
-                  >
-                    <span>NGO Hub</span>
-                    {user.ngoProfile && (
-                      <StatusBadge status={user.ngoProfile.verificationStatus} />
-                    )}
-                  </button>
+                  <>
+                    <button
+                      onClick={() => setCurrentView('ngo-dashboard')}
+                      className={`text-xs px-3 py-1.5 rounded-lg font-semibold flex items-center space-x-1.5 transition-all ${
+                        currentView === 'ngo-dashboard'
+                          ? 'bg-emerald-600 text-white shadow'
+                          : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                      }`}
+                    >
+                      <span>NGO Hub</span>
+                      {user.ngoProfile && (
+                        <StatusBadge status={user.ngoProfile.verificationStatus} />
+                      )}
+                    </button>
+                    <button
+                      onClick={() => setCurrentView('my-resources')}
+                      className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-all ${
+                        currentView === 'my-resources'
+                          ? 'bg-emerald-600 text-white shadow'
+                          : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                      }`}
+                    >
+                      My Listings
+                    </button>
+                  </>
                 )}
 
                 {user.role === 'admin' && (

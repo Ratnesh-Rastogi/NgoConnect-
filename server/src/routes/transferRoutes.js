@@ -6,13 +6,13 @@ import { createTransferSchema, updateTransferStatusSchema } from '../validators/
 
 const router = Router();
 
-// Donor: create a donation pledge toward an open request
+// Donor: create a donation toward an open request
 router.post('/', authenticateUser, requireRoles('donor'), validateBody(createTransferSchema), transferController.create);
 
-// Donor: view pledges made by them
+// Donor: view donations made by them
 router.get('/my/donor', authenticateUser, requireRoles('donor'), transferController.listMyTransfers);
 
-// NGO: view transfers pledged to their organization
+// NGO: view transfers donated to their organization
 router.get('/my/ngo', authenticateUser, requireRoles('ngo'), transferController.listNgoTransfers);
 
 // Update transfer status (Donor marks IN_TRANSIT, NGO marks RECEIVED, either can CANCEL)

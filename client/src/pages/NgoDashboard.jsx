@@ -257,7 +257,7 @@ export const NgoDashboard = () => {
             </div>
           ) : transfers.length === 0 ? (
             <div className="text-center py-16 text-gray-500 text-xs">
-              No donor transfers pledged yet.
+              No donations received yet.
             </div>
           ) : (
             <div className="divide-y divide-gray-100">
@@ -273,7 +273,7 @@ export const NgoDashboard = () => {
                       </div>
 
                       <p className="text-xs text-gray-600">
-                        Donor: <strong className="text-gray-900">{t.donor?.name}</strong> • Pledged:{' '}
+                        Donor: <strong className="text-gray-900">{t.donor?.name}</strong> • Donated:{' '}
                         <strong className="text-emerald-700">{t.quantity}</strong> {t.request?.unit || 'units'}
                       </p>
 

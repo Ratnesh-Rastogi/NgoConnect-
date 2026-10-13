@@ -34,11 +34,32 @@ enum RequestStatus {
   CANCELLED
 }
 
+enum ResourceStatus {
+  ACTIVE
+  EXHAUSTED
+  EXPIRED
+  WITHDRAWN
+}
+
 enum TransferStatus {
   PENDING
   IN_TRANSIT
   RECEIVED
   CANCELLED
+}
+
+model Category {
+  id               String            @id @default(uuid())
+  name             String            @unique
+  slug             String            @unique
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  ngoProfiles      NgoProfile[]
+  resourceRequests ResourceRequest[]
+  resources        Resource[]
+
+  @@map("categories")
 }
 
 model User {
@@ -51,6 +72,7 @@ model User {
   updatedAt    DateTime    @updatedAt
 
   ngoProfile   NgoProfile?
+  resources    Resource[]
   transfers    Transfer[]  @relation("DonorTransfers")
 
   @@map("users")
@@ -63,7 +85,8 @@ model NgoProfile {
   orgName            String
   regNumber          String             @unique
   description        String
-  category           String
+  categoryId         String
+  category           Category           @relation(fields: [categoryId], references: [id])
   contactPhone       String
   address            String
   city               String
@@ -85,13 +108,17 @@ model ResourceRequest {
   ngoProfile        NgoProfile    @relation(fields: [ngoProfileId], references: [id], onDelete: Cascade)
   title             String
   description       String
-  category          String
+  categoryId        String
+  category          Category      @relation(fields: [categoryId], references: [id])
   urgency           UrgencyLevel  @default(MEDIUM)
   quantityNeeded    Int
   quantityFulfilled Int           @default(0)
   quantityReserved  Int           @default(0)
   unit              String
-  location          String
+  city              String
+  state             String
+  latitude          Float
+  longitude         Float
   status            RequestStatus @default(OPEN)
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
@@ -101,21 +128,48 @@ model ResourceRequest {
   @@map("resource_requests")
 }
 
+model Resource {
+  id                String         @id @default(uuid())
+  title             String
+  description       String
+  categoryId        String
+  category          Category       @relation(fields: [categoryId], references: [id])
+  quantityTotal     Int
+  quantityAvailable Int
+  unit              String
+  expiryDate        DateTime?
+  city              String
+  state             String
+  latitude          Float
+  longitude         Float
+  status            ResourceStatus @default(ACTIVE)
+  ownerId           String
+  owner             User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  transfers         Transfer[]
+
+  @@map("resources")
+}
+
 model Transfer {
-  id           String          @id @default(uuid())
+  id           String           @id @default(uuid())
   donorId      String
-  donor        User            @relation("DonorTransfers", fields: [donorId], references: [id], onDelete: Cascade)
+  donor        User             @relation("DonorTransfers", fields: [donorId], references: [id], onDelete: Cascade)
   ngoProfileId String
-  ngoProfile   NgoProfile      @relation("NgoTransfers", fields: [ngoProfileId], references: [id], onDelete: Cascade)
-  requestId    String
-  request      ResourceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  ngoProfile   NgoProfile       @relation("NgoTransfers", fields: [ngoProfileId], references: [id], onDelete: Cascade)
+  requestId    String?
+  request      ResourceRequest? @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  resourceId   String?
+  resource     Resource?        @relation(fields: [resourceId], references: [id], onDelete: Cascade)
   quantity     Int
-  status       TransferStatus  @default(PENDING)
+  status       TransferStatus   @default(PENDING)
   donorNote    String?
   trackingInfo String?
   receivedAt   DateTime?
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
 
   @@map("transfers")
 }

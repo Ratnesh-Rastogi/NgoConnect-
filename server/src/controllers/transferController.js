@@ -1,7 +1,7 @@
 import * as transferService from '../services/transferService.js';
 import { toSafeTransfer } from '../mappers/transferMapper.js';
 
-// Donor pledges a transfer/donation
+// Donor creates a transfer/donation
 export const create = async (req, res, next) => {
   try {
     const transfer = await transferService.createTransfer(req.user, req.body);
@@ -25,7 +25,7 @@ export const updateStatus = async (req, res, next) => {
   }
 };
 
-// List transfers pledged by the authenticated donor
+// List transfers made by the authenticated donor
 export const listMyTransfers = async (req, res, next) => {
   try {
     const transfers = await transferService.listDonorTransfers(req.user.id);

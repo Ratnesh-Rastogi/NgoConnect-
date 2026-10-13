@@ -1,10 +1,10 @@
 import { prisma } from '../config/prisma.js';
 import { AppError } from '../errors/AppError.js';
 
-// Donor pledges a transfer/donation toward an active NGO request
+// Donor creates a transfer/donation toward an active NGO request
 export const createTransfer = async (user, { requestId, quantity, donorNote }) => {
   if (user.role !== 'donor') {
-    throw new AppError('Forbidden: Only donors can pledge transfers', 403);
+    throw new AppError('Forbidden: Only donors can make donations', 403);
   }
 
   // Use interactive transaction to guarantee atomic reservation and prevent race conditions
@@ -81,7 +81,8 @@ export const updateTransferStatus = async (user, transferId, { status: newStatus
       include: {
         request: true,
         ngoProfile: true,
-        donor: true
+        donor: true,
+        resource: true
       }
     });
 
@@ -94,14 +95,14 @@ export const updateTransferStatus = async (user, transferId, { status: newStatus
       throw new AppError(`Cannot update a transfer that is already ${transfer.status}`, 400);
     }
 
-    const isDonorOwner = transfer.donorId === user.id;
+    const isDonorOwner = transfer.donorId === user.id || (transfer.resource && transfer.resource.ownerId === user.id);
     const isNgoReceiver = transfer.ngoProfile.userId === user.id;
     const isAdmin = user.role === 'admin';
 
-    // 1. Mark IN_TRANSIT (Only the donor who pledged it, or admin)
+    // 1. Mark IN_TRANSIT (Only the donor who made it, resource owner, or admin)
     if (newStatus === 'IN_TRANSIT') {
       if (!isDonorOwner && !isAdmin) {
-        throw new AppError('Forbidden: Only the donating donor can mark a transfer IN_TRANSIT', 403);
+        throw new AppError('Forbidden: Only the donating donor or resource owner can mark a transfer IN_TRANSIT', 403);
       }
       return tx.transfer.update({
         where: { id: transferId },
@@ -109,7 +110,7 @@ export const updateTransferStatus = async (user, transferId, { status: newStatus
           status: 'IN_TRANSIT',
           trackingInfo: trackingInfo ?? transfer.trackingInfo
         },
-        include: { donor: true, request: true, ngoProfile: true }
+        include: { donor: true, request: true, ngoProfile: true, resource: true }
       });
     }
 
@@ -119,19 +120,21 @@ export const updateTransferStatus = async (user, transferId, { status: newStatus
         throw new AppError('Forbidden: Only the receiving NGO can confirm receipt of a transfer', 403);
       }
 
-      // Decrement reserved and increment fulfilled
-      const newFulfilled = transfer.request.quantityFulfilled + transfer.quantity;
-      const newReserved = Math.max(0, transfer.request.quantityReserved - transfer.quantity);
-      const isFulfilled = newFulfilled >= transfer.request.quantityNeeded;
+      // Decrement reserved and increment fulfilled ONLY if requestId exists
+      if (transfer.requestId && transfer.request) {
+        const newFulfilled = transfer.request.quantityFulfilled + transfer.quantity;
+        const newReserved = Math.max(0, transfer.request.quantityReserved - transfer.quantity);
+        const isFulfilled = newFulfilled >= transfer.request.quantityNeeded;
 
-      await tx.resourceRequest.update({
-        where: { id: transfer.requestId },
-        data: {
-          quantityFulfilled: newFulfilled,
-          quantityReserved: newReserved,
-          status: isFulfilled ? 'FULFILLED' : 'PARTIAL'
-        }
-      });
+        await tx.resourceRequest.update({
+          where: { id: transfer.requestId },
+          data: {
+            quantityFulfilled: newFulfilled,
+            quantityReserved: newReserved,
+            status: isFulfilled ? 'FULFILLED' : 'PARTIAL'
+          }
+        });
+      }
 
       return tx.transfer.update({
         where: { id: transferId },
@@ -139,37 +142,66 @@ export const updateTransferStatus = async (user, transferId, { status: newStatus
           status: 'RECEIVED',
           receivedAt: new Date()
         },
-        include: { donor: true, request: true, ngoProfile: true }
+        include: { donor: true, request: true, ngoProfile: true, resource: true }
       });
     }
 
-    // 3. Mark CANCELLED (Can be cancelled by donor, receiving NGO, or admin)
+    // 3. Mark CANCELLED (Can be cancelled by donor/owner, receiving NGO, or admin)
     if (newStatus === 'CANCELLED') {
       if (!isDonorOwner && !isNgoReceiver && !isAdmin) {
         throw new AppError('Forbidden: You do not have permission to cancel this transfer', 403);
       }
 
-      // Release reserved quantity back to request
-      const newReserved = Math.max(0, transfer.request.quantityReserved - transfer.quantity);
-      const newStatus =
-        transfer.request.quantityFulfilled >= transfer.request.quantityNeeded
-          ? 'FULFILLED'
-          : transfer.request.quantityFulfilled > 0
-          ? 'PARTIAL'
-          : 'OPEN';
+      // If linked to a request, release reserved quantity back to request
+      if (transfer.requestId && transfer.request) {
+        const newReserved = Math.max(0, transfer.request.quantityReserved - transfer.quantity);
+        const newRequestStatus =
+          transfer.request.quantityFulfilled >= transfer.request.quantityNeeded
+            ? 'FULFILLED'
+            : transfer.request.quantityFulfilled > 0
+            ? 'PARTIAL'
+            : 'OPEN';
 
-      await tx.resourceRequest.update({
-        where: { id: transfer.requestId },
-        data: {
-          quantityReserved: newReserved,
-          status: newStatus
+        await tx.resourceRequest.update({
+          where: { id: transfer.requestId },
+          data: {
+            quantityReserved: newReserved,
+            status: newRequestStatus
+          }
+        });
+      }
+
+      // If linked to a resource:
+      // Cancel/reject of a transfer linked to a resource must add the quantity
+      // back to quantityAvailable and set the resource back to ACTIVE if it was
+      // EXHAUSTED (unless it is expired or withdrawn).
+      if (transfer.resourceId) {
+        const currentResource = await tx.resource.findUnique({
+          where: { id: transfer.resourceId }
+        });
+
+        if (currentResource) {
+          const newQtyAvailable = currentResource.quantityAvailable + transfer.quantity;
+          const isExpired = currentResource.expiryDate && new Date(currentResource.expiryDate) < new Date();
+          const shouldReactivate =
+            currentResource.status === 'EXHAUSTED' &&
+            !isExpired &&
+            currentResource.status !== 'WITHDRAWN';
+
+          await tx.resource.update({
+            where: { id: transfer.resourceId },
+            data: {
+              quantityAvailable: newQtyAvailable,
+              ...(shouldReactivate ? { status: 'ACTIVE' } : {})
+            }
+          });
         }
-      });
+      }
 
       return tx.transfer.update({
         where: { id: transferId },
         data: { status: 'CANCELLED' },
-        include: { donor: true, request: true, ngoProfile: true }
+        include: { donor: true, request: true, ngoProfile: true, resource: true }
       });
     }
 
@@ -177,14 +209,15 @@ export const updateTransferStatus = async (user, transferId, { status: newStatus
   });
 };
 
-// List transfers pledged by the logged-in donor
+// List transfers created by the logged-in donor
 export const listDonorTransfers = async (donorId) => {
   return prisma.transfer.findMany({
     where: { donorId },
     include: {
       request: true,
       ngoProfile: true,
-      donor: true
+      donor: true,
+      resource: true
     },
     orderBy: { createdAt: 'desc' }
   });
@@ -205,7 +238,8 @@ export const listNgoTransfers = async (userId) => {
     include: {
       request: true,
       ngoProfile: true,
-      donor: true
+      donor: true,
+      resource: true
     },
     orderBy: { createdAt: 'desc' }
   });
@@ -218,7 +252,8 @@ export const getTransferById = async (user, transferId) => {
     include: {
       request: true,
       ngoProfile: true,
-      donor: true
+      donor: true,
+      resource: true
     }
   });
 
@@ -226,7 +261,7 @@ export const getTransferById = async (user, transferId) => {
     throw new AppError('Transfer not found', 404);
   }
 
-  const isDonorOwner = transfer.donorId === user.id;
+  const isDonorOwner = transfer.donorId === user.id || (transfer.resource && transfer.resource.ownerId === user.id);
   const isNgoReceiver = transfer.ngoProfile.userId === user.id;
   const isAdmin = user.role === 'admin';
 

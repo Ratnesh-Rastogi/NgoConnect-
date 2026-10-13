@@ -12,7 +12,8 @@ export const registerSchema = z
     orgName: z.string().min(2, 'Organization name is required for NGOs').optional(),
     regNumber: z.string().min(2, 'Registration number is required for NGOs').optional(),
     description: z.string().min(5, 'Organization description is required for NGOs').optional(),
-    category: z.string().min(2, 'Category is required for NGOs').optional(),
+    categoryId: z.string().optional(),
+    category: z.string().optional(),
     contactPhone: z.string().min(5, 'Contact phone is required for NGOs').optional(),
     address: z.string().min(3, 'Address is required for NGOs').optional(),
     city: z.string().min(2, 'City is required for NGOs').optional(),
@@ -20,11 +21,17 @@ export const registerSchema = z
   })
   .superRefine((data, ctx) => {
     if (data.role === 'ngo') {
+      if (!data.categoryId && !data.category) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'category or categoryId is required for NGO registration',
+          path: ['category']
+        });
+      }
       const requiredNgoFields = [
         'orgName',
         'regNumber',
         'description',
-        'category',
         'contactPhone',
         'address',
         'city'
