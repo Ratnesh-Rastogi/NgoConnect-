@@ -1,0 +1,121 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  donor
+  ngo
+  admin
+}
+
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum UrgencyLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum RequestStatus {
+  OPEN
+  PARTIAL
+  FULFILLED
+  CANCELLED
+}
+
+enum TransferStatus {
+  PENDING
+  IN_TRANSIT
+  RECEIVED
+  CANCELLED
+}
+
+model User {
+  id           String      @id @default(uuid())
+  email        String      @unique
+  passwordHash String
+  name         String
+  role         Role        @default(donor)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  ngoProfile   NgoProfile?
+  transfers    Transfer[]  @relation("DonorTransfers")
+
+  @@map("users")
+}
+
+model NgoProfile {
+  id                 String             @id @default(uuid())
+  userId             String             @unique
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orgName            String
+  regNumber          String             @unique
+  description        String
+  category           String
+  contactPhone       String
+  address            String
+  city               String
+  verificationStatus VerificationStatus @default(PENDING)
+  verificationNotes  String?
+  verificationDocUrl String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  requests           ResourceRequest[]
+  transfersReceived  Transfer[]         @relation("NgoTransfers")
+
+  @@map("ngo_profiles")
+}
+
+model ResourceRequest {
+  id                String        @id @default(uuid())
+  ngoProfileId      String
+  ngoProfile        NgoProfile    @relation(fields: [ngoProfileId], references: [id], onDelete: Cascade)
+  title             String
+  description       String
+  category          String
+  urgency           UrgencyLevel  @default(MEDIUM)
+  quantityNeeded    Int
+  quantityFulfilled Int           @default(0)
+  quantityReserved  Int           @default(0)
+  unit              String
+  location          String
+  status            RequestStatus @default(OPEN)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  transfers         Transfer[]
+
+  @@map("resource_requests")
+}
+
+model Transfer {
+  id           String          @id @default(uuid())
+  donorId      String
+  donor        User            @relation("DonorTransfers", fields: [donorId], references: [id], onDelete: Cascade)
+  ngoProfileId String
+  ngoProfile   NgoProfile      @relation("NgoTransfers", fields: [ngoProfileId], references: [id], onDelete: Cascade)
+  requestId    String
+  request      ResourceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  quantity     Int
+  status       TransferStatus  @default(PENDING)
+  donorNote    String?
+  trackingInfo String?
+  receivedAt   DateTime?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@map("transfers")
+}
