@@ -153,6 +153,31 @@ export const updateNgoStatus = async (adminUser, ngoId, { verificationStatus, ve
       }
     });
 
+    // Write notification to NGO user inside same transaction
+    const finalReason = reason || verificationNotes || notes || '';
+    let notifTitle = 'NGO Status Update';
+    let notifMessage = `Your organization verification status was updated to ${verificationStatus}.`;
+
+    if (verificationStatus === 'APPROVED') {
+      notifTitle = 'Organization Approved';
+      notifMessage = `Your organization (${ngo.orgName}) has been approved by the platform administrator.`;
+    } else if (verificationStatus === 'REJECTED') {
+      notifTitle = 'Verification Rejected';
+      notifMessage = `Your organization verification was rejected: ${finalReason}`;
+    } else if (verificationStatus === 'SUSPENDED') {
+      notifTitle = 'Organization Suspended';
+      notifMessage = `Your organization account has been suspended: ${finalReason || 'Suspended by administrator'}`;
+    }
+
+    await tx.notification.create({
+      data: {
+        userId: ngo.userId,
+        type: `NGO_${verificationStatus}`,
+        title: notifTitle,
+        message: notifMessage
+      }
+    });
+
     return updated;
   });
 };

@@ -20,6 +20,17 @@ export const toSafeTransfer = (transfer) => {
     donor: transfer.donor ? toSafeUser(transfer.donor) : undefined,
     request: transfer.request ? toPublicRequest(transfer.request) : undefined,
     resource: transfer.resource ? toPublicResource(transfer.resource) : undefined,
-    ngo: transfer.ngoProfile ? toPublicNgo(transfer.ngoProfile) : undefined
+    ngo: transfer.ngoProfile ? toPublicNgo(transfer.ngoProfile) : undefined,
+    events: transfer.events
+      ? transfer.events.map((e) => ({
+          id: e.id,
+          fromStatus: e.fromStatus,
+          toStatus: e.toStatus,
+          changedById: e.changedById,
+          changedBy: e.changedBy ? toSafeUser(e.changedBy) : undefined,
+          note: e.note,
+          createdAt: e.createdAt
+        }))
+      : []
   };
 };

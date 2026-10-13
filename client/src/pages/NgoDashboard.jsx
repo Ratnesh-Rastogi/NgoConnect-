@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { StatusBadge } from '../components/StatusBadge.jsx';
 import { UrgencyBadge } from '../components/UrgencyBadge.jsx';
 import { RequestModal } from '../components/RequestModal.jsx';
+import { TransferTimeline } from '../components/TransferTimeline.jsx';
 import {
   Building2,
   PlusCircle,
@@ -19,7 +20,9 @@ import {
   Upload,
   RefreshCw,
   FileCheck,
-  ArrowUpRight
+  ArrowUpRight,
+  TrendingUp,
+  BarChart2
 } from 'lucide-react';
 
 export const NgoDashboard = () => {
@@ -28,6 +31,7 @@ export const NgoDashboard = () => {
   const [requests, setRequests] = useState([]);
   const [transfers, setTransfers] = useState([]);
   const [documents, setDocuments] = useState([]);
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadingDocs, setLoadingDocs] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -49,12 +53,14 @@ export const NgoDashboard = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [reqRes, trRes] = await Promise.all([
+      const [reqRes, trRes, statsRes] = await Promise.all([
         api.get('/requests/my/all'),
-        api.get('/transfers/my/ngo')
+        api.get('/transfers/my/ngo'),
+        api.get('/dashboard/ngo').catch(() => ({ data: { data: null } }))
       ]);
       setRequests(reqRes.data.data || []);
       setTransfers(trRes.data.data || []);
+      setStats(statsRes.data?.data || null);
     } catch (err) {
       console.error('Error fetching NGO dashboard data:', err);
     } finally {
@@ -337,6 +343,63 @@ export const NgoDashboard = () => {
         </button>
       </div>
 
+      {/* NGO Scoped Aggregate Metrics */}
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-sm flex items-center space-x-4">
+          <div className="p-3 rounded-xl bg-emerald-50 text-emerald-700">
+            <Package className="w-6 h-6" />
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-500">Open Resource Needs</p>
+            <p className="text-2xl font-extrabold text-gray-900">
+              {stats?.openRequestsCount ?? requests.filter((r) => r.status === 'OPEN' || r.status === 'PARTIAL').length}
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-sm flex items-center space-x-4">
+          <div className="p-3 rounded-xl bg-blue-50 text-blue-700">
+            <TrendingUp className="w-6 h-6" />
+          </div>
+          <div className="flex-1">
+            <div className="flex justify-between items-center mb-1">
+              <p className="text-xs font-medium text-gray-500">Fulfilment Rate</p>
+              <span className="text-xs font-bold text-blue-700">{stats?.fulfilmentRate ?? 0}%</span>
+            </div>
+            <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+              <div
+                className="bg-blue-600 h-2 rounded-full transition-all"
+                style={{ width: `${Math.min(100, stats?.fulfilmentRate ?? 0)}%` }}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-sm flex items-center space-x-4">
+          <div className="p-3 rounded-xl bg-purple-50 text-purple-700">
+            <Truck className="w-6 h-6" />
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-500">In-Transit Donations</p>
+            <p className="text-2xl font-extrabold text-purple-700">
+              {stats?.transfersByStatus?.IN_TRANSIT ?? transfers.filter((t) => t.status === 'IN_TRANSIT').length}
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-sm flex items-center space-x-4">
+          <div className="p-3 rounded-xl bg-emerald-50 text-emerald-700">
+            <CheckCircle2 className="w-6 h-6" />
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-500">Completed Transfers</p>
+            <p className="text-2xl font-extrabold text-emerald-700">
+              {stats?.transfersByStatus?.RECEIVED ?? transfers.filter((t) => t.status === 'RECEIVED').length}
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Tabs */}
       <div className="border-b border-gray-200">
         <nav className="flex space-x-6 text-xs font-bold">
@@ -520,6 +583,9 @@ export const NgoDashboard = () => {
                       )}
                     </div>
                   </div>
+
+                  {/* Transfer Lifecycle Timeline */}
+                  <TransferTimeline events={t.events} />
                 </div>
               ))}
             </div>

@@ -12,6 +12,7 @@ import { NgosDirectoryPage } from './pages/NgosDirectoryPage.jsx';
 import { BrowseResourcesPage } from './pages/BrowseResourcesPage.jsx';
 import { CreateResourcePage } from './pages/CreateResourcePage.jsx';
 import { MyResourcesPage } from './pages/MyResourcesPage.jsx';
+import { NotificationsPage } from './pages/NotificationsPage.jsx';
 import { HeartHandshake } from 'lucide-react';
 
 const MainLayout = () => {
@@ -28,6 +29,8 @@ const MainLayout = () => {
         return <CreateResourcePage onNavigate={setCurrentView} />;
       case 'my-resources':
         return <MyResourcesPage onNavigate={setCurrentView} />;
+      case 'notifications':
+        return <NotificationsPage onNavigate={setCurrentView} />;
       case 'ngos':
         return <NgosDirectoryPage />;
       case 'ai-matcher':

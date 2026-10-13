@@ -75,6 +75,8 @@ model User {
   resources           Resource[]
   transfers           Transfer[]               @relation("DonorTransfers")
   verificationReviews NgoVerificationReview[]  @relation("AdminVerificationReviews")
+  transferEvents      TransferEvent[]
+  notifications       Notification[]
 
   @@map("users")
 }
@@ -201,5 +203,35 @@ model Transfer {
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
 
+  events       TransferEvent[]
+
   @@map("transfers")
 }
+
+model TransferEvent {
+  id          String          @id @default(uuid())
+  transferId  String
+  transfer    Transfer        @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  fromStatus  TransferStatus?
+  toStatus    TransferStatus
+  changedById String
+  changedBy   User            @relation(fields: [changedById], references: [id], onDelete: Cascade)
+  note        String?
+  createdAt   DateTime        @default(now())
+
+  @@map("transfer_events")
+}
+
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  message   String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@map("notifications")
+}
+

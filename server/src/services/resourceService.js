@@ -236,7 +236,7 @@ export const claimResource = async (user, resourceId, { quantity, claimNote }) =
     }
 
     // Create the transfer record representing the claim
-    return tx.transfer.create({
+    const transfer = await tx.transfer.create({
       data: {
         donorId: target.ownerId,
         ngoProfileId: user.ngoProfile.id,
@@ -244,11 +244,53 @@ export const claimResource = async (user, resourceId, { quantity, claimNote }) =
         quantity,
         status: 'PENDING',
         donorNote: claimNote || null
-      },
+      }
+    });
+
+    // Write initial TransferEvent inside same transaction
+    await tx.transferEvent.create({
+      data: {
+        transferId: transfer.id,
+        fromStatus: null,
+        toStatus: 'PENDING',
+        changedById: user.id,
+        note: claimNote ? `Claimed: ${claimNote}` : 'Resource claimed by NGO'
+      }
+    });
+
+    // Write notifications inside same transaction
+    // 1. Notify the resource owner
+    await tx.notification.create({
+      data: {
+        userId: target.ownerId,
+        type: 'RESOURCE_CLAIMED',
+        title: 'Resource Listing Claimed',
+        message: `${user.ngoProfile.orgName} claimed ${quantity} ${target.unit} of your listing "${target.title}".`
+      }
+    });
+
+    // 2. Notify the claiming NGO user
+    await tx.notification.create({
+      data: {
+        userId: user.id,
+        type: 'CLAIM_RECORDED',
+        title: 'Resource Claim Recorded',
+        message: `You claimed ${quantity} ${target.unit} from "${target.title}".`
+      }
+    });
+
+    return tx.transfer.findUnique({
+      where: { id: transfer.id },
       include: {
         donor: true,
         ngoProfile: true,
-        resource: { include: { category: true } }
+        resource: { include: { category: true } },
+        events: {
+          include: {
+            changedBy: { select: { id: true, name: true, role: true } }
+          },
+          orderBy: { createdAt: 'asc' }
+        }
       }
     });
   });

@@ -1,21 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/client.js';
 import { StatusBadge } from '../components/StatusBadge.jsx';
-import { Package, Truck, CheckCircle2, XCircle, AlertCircle, Building2, ExternalLink } from 'lucide-react';
+import { TransferTimeline } from '../components/TransferTimeline.jsx';
+import {
+  Package,
+  Truck,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  Building2,
+  ExternalLink,
+  Layers
+} from 'lucide-react';
 
 export const DonorDashboard = ({ onNavigate }) => {
   const [transfers, setTransfers] = useState([]);
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeDispatchId, setActiveDispatchId] = useState(null);
   const [trackingInput, setTrackingInput] = useState('');
 
-  const fetchTransfers = async () => {
+  const fetchData = async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get('/transfers/my/donor');
-      setTransfers(res.data.data || []);
+      const [transfersRes, statsRes] = await Promise.all([
+        api.get('/transfers/my/donor'),
+        api.get('/dashboard/donor')
+      ]);
+      setTransfers(transfersRes.data.data || []);
+      setStats(statsRes.data.data || null);
     } catch (err) {
       setError(err.message || 'Failed to load donations');
     } finally {
@@ -24,7 +39,7 @@ export const DonorDashboard = ({ onNavigate }) => {
   };
 
   useEffect(() => {
-    fetchTransfers();
+    fetchData();
   }, []);
 
   const handleUpdateStatus = async (transferId, newStatus, trackingInfo) => {
@@ -35,16 +50,17 @@ export const DonorDashboard = ({ onNavigate }) => {
       });
       setActiveDispatchId(null);
       setTrackingInput('');
-      fetchTransfers();
+      fetchData();
     } catch (err) {
       alert(`Status update failed: ${err.message}`);
     }
   };
 
-  // Metrics
-  const totalPledged = transfers.reduce((sum, t) => sum + (t.status !== 'CANCELLED' ? t.quantity : 0), 0);
-  const inTransitCount = transfers.filter((t) => t.status === 'IN_TRANSIT').length;
-  const receivedCount = transfers.filter((t) => t.status === 'RECEIVED').length;
+  // Metrics from scoped dashboard endpoint, falling back to local list counts
+  const totalQuantityDonated = stats?.totalQuantityDonated ?? transfers.reduce((sum, t) => sum + (t.status !== 'CANCELLED' ? t.quantity : 0), 0);
+  const completedDeliveries = stats?.completedDeliveries ?? transfers.filter((t) => t.status === 'RECEIVED').length;
+  const inTransitCount = stats?.inTransitCount ?? transfers.filter((t) => t.status === 'IN_TRANSIT').length;
+  const myDonationsCount = stats?.myDonationsCount ?? transfers.length;
 
   return (
     <div className="space-y-8 pb-12">
@@ -53,7 +69,7 @@ export const DonorDashboard = ({ onNavigate }) => {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Donor Dashboard</h1>
           <p className="text-xs text-gray-500 mt-0.5">
-            Track and manage your resource donations and shipment dispatches
+            Track and manage your resource donations, shipments, and delivery timelines
           </p>
         </div>
         <button
@@ -64,15 +80,25 @@ export const DonorDashboard = ({ onNavigate }) => {
         </button>
       </div>
 
-      {/* Metrics Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* Metrics Row (Scoped to current donor) */}
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-sm flex items-center space-x-4">
           <div className="p-3 rounded-xl bg-emerald-50 text-emerald-700">
             <Package className="w-6 h-6" />
           </div>
           <div>
             <p className="text-xs font-medium text-gray-500">Total Units Donated</p>
-            <p className="text-2xl font-extrabold text-gray-900">{totalPledged}</p>
+            <p className="text-2xl font-extrabold text-gray-900">{totalQuantityDonated}</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-sm flex items-center space-x-4">
+          <div className="p-3 rounded-xl bg-purple-50 text-purple-700">
+            <CheckCircle2 className="w-6 h-6" />
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-500">Completed Deliveries</p>
+            <p className="text-2xl font-extrabold text-purple-700">{completedDeliveries}</p>
           </div>
         </div>
 
@@ -87,12 +113,12 @@ export const DonorDashboard = ({ onNavigate }) => {
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-sm flex items-center space-x-4">
-          <div className="p-3 rounded-xl bg-purple-50 text-purple-700">
-            <CheckCircle2 className="w-6 h-6" />
+          <div className="p-3 rounded-xl bg-gray-100 text-gray-700">
+            <Layers className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-xs font-medium text-gray-500">Confirmed Deliveries</p>
-            <p className="text-2xl font-extrabold text-purple-700">{receivedCount}</p>
+            <p className="text-xs font-medium text-gray-500">Donation Transfers</p>
+            <p className="text-2xl font-extrabold text-gray-900">{myDonationsCount}</p>
           </div>
         </div>
       </div>
@@ -100,7 +126,7 @@ export const DonorDashboard = ({ onNavigate }) => {
       {/* Transfers List */}
       <div className="bg-white rounded-3xl border border-gray-200/80 shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-          <h2 className="text-sm font-bold text-gray-900">Your Donations</h2>
+          <h2 className="text-sm font-bold text-gray-900">Your Donations & Dispatches</h2>
           <span className="text-xs text-gray-500">{transfers.length} records</span>
         </div>
 
@@ -130,12 +156,12 @@ export const DonorDashboard = ({ onNavigate }) => {
         ) : (
           <div className="divide-y divide-gray-100">
             {transfers.map((item) => (
-              <div key={item.id} className="p-6 hover:bg-gray-50/60 transition-colors">
+              <div key={item.id} className="p-6 hover:bg-gray-50/60 transition-colors space-y-4">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                   <div className="space-y-1.5 max-w-xl">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-bold text-gray-900">
-                        {item.request?.title || 'Resource Request'}
+                        {item.request?.title || item.resource?.title || 'Resource Transfer'}
                       </span>
                       <StatusBadge status={item.status} />
                     </div>
@@ -237,6 +263,9 @@ export const DonorDashboard = ({ onNavigate }) => {
                     )}
                   </div>
                 </div>
+
+                {/* Transfer Lifecycle Event Timeline */}
+                <TransferTimeline events={item.events} />
               </div>
             ))}
           </div>

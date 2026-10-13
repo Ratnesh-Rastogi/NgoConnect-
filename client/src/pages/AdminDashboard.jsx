@@ -15,22 +15,41 @@ import {
   History,
   FileCheck,
   Download,
-  AlertCircle
+  AlertCircle,
+  TrendingUp,
+  Package,
+  Layers,
+  Users
 } from 'lucide-react';
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend
+} from 'recharts';
 
 export const AdminDashboard = () => {
   const [ngos, setNgos] = useState([]);
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState('');
   const [selectedNgo, setSelectedNgo] = useState(null);
 
-  const fetchNgos = async () => {
+  const fetchDashboardData = async () => {
     setLoading(true);
     try {
       const params = {};
       if (filterStatus) params.status = filterStatus;
-      const res = await api.get('/ngos/admin/all', { params });
-      setNgos(res.data.data || []);
+      const [ngosRes, statsRes] = await Promise.all([
+        api.get('/ngos/admin/all', { params }),
+        api.get('/dashboard/admin').catch(() => ({ data: { data: null } }))
+      ]);
+      setNgos(ngosRes.data.data || []);
+      setStats(statsRes.data?.data || null);
     } catch (err) {
       console.error('Failed to load NGOs for admin oversight:', err);
     } finally {
@@ -39,11 +58,13 @@ export const AdminDashboard = () => {
   };
 
   useEffect(() => {
-    fetchNgos();
+    fetchDashboardData();
   }, [filterStatus]);
 
-  const pendingCount = ngos.filter((n) => n.verificationStatus === 'PENDING').length;
-  const approvedCount = ngos.filter((n) => n.verificationStatus === 'APPROVED').length;
+  const pendingCount = stats?.pendingNgosCount ?? ngos.filter((n) => n.verificationStatus === 'PENDING').length;
+  const approvedCount = stats?.platformTotals?.approvedNgos ?? ngos.filter((n) => n.verificationStatus === 'APPROVED').length;
+  const totalTransfers = stats?.platformTotals?.totalTransfers ?? 0;
+  const totalQuantity = stats?.platformTotals?.totalQuantityTransferred ?? 0;
 
   return (
     <div className="space-y-8 pb-12">
@@ -54,12 +75,12 @@ export const AdminDashboard = () => {
           <h1 className="text-2xl font-bold text-gray-900">Administrator Governance & Verification</h1>
         </div>
         <p className="text-xs text-gray-500 mt-1">
-          Review uploaded credentials, stream verification documents, and audit organizational status changes
+          Review credentials, stream verification documents, track platform totals, and audit transfers over time
         </p>
       </div>
 
-      {/* Metrics Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* Platform Totals & Metrics */}
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-sm flex items-center space-x-4">
           <div className="p-3 rounded-xl bg-amber-50 text-amber-700">
             <AlertTriangle className="w-6 h-6" />
@@ -75,19 +96,98 @@ export const AdminDashboard = () => {
             <CheckCircle className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-xs font-medium text-gray-500">Approved Organizations</p>
+            <p className="text-xs font-medium text-gray-500">Approved NGOs</p>
             <p className="text-2xl font-extrabold text-emerald-700">{approvedCount}</p>
           </div>
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-sm flex items-center space-x-4">
-          <div className="p-3 rounded-xl bg-gray-100 text-gray-700">
-            <Building2 className="w-6 h-6" />
+          <div className="p-3 rounded-xl bg-blue-50 text-blue-700">
+            <Package className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-xs font-medium text-gray-500">Total Registered</p>
-            <p className="text-2xl font-extrabold text-gray-900">{ngos.length}</p>
+            <p className="text-xs font-medium text-gray-500">Total Transfers</p>
+            <p className="text-2xl font-extrabold text-blue-700">{totalTransfers}</p>
           </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-sm flex items-center space-x-4">
+          <div className="p-3 rounded-xl bg-purple-50 text-purple-700">
+            <Layers className="w-6 h-6" />
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-500">Units Delivered</p>
+            <p className="text-2xl font-extrabold text-purple-700">{totalQuantity}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Recharts Chart: Transfers Over Time */}
+      <div className="bg-white rounded-3xl border border-gray-200/80 shadow-sm p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+          <div>
+            <h2 className="text-sm font-bold text-gray-900 flex items-center space-x-2">
+              <TrendingUp className="w-4 h-4 text-emerald-600" />
+              <span>Platform Resource Transfers Over Time</span>
+            </h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Volume and completion activity across relief initiatives
+            </p>
+          </div>
+          <span className="text-[11px] font-mono text-gray-400">
+            Aggregate Time Series
+          </span>
+        </div>
+
+        <div className="h-64 w-full pt-2">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart
+              data={stats?.transfersOverTime || [{ date: 'Today', transfers: 0, completed: 0 }]}
+              margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+            >
+              <defs>
+                <linearGradient id="colorTransfers" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="colorCompleted" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#64748b' }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#64748b' }} />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: '#ffffff',
+                  borderRadius: '0.75rem',
+                  border: '1px solid #e2e8f0',
+                  boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                  fontSize: '12px'
+                }}
+              />
+              <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+              <Area
+                type="monotone"
+                dataKey="transfers"
+                name="Created Transfers"
+                stroke="#10b981"
+                fillOpacity={1}
+                fill="url(#colorTransfers)"
+                strokeWidth={2}
+              />
+              <Area
+                type="monotone"
+                dataKey="completed"
+                name="Delivered & Verified"
+                stroke="#6366f1"
+                fillOpacity={1}
+                fill="url(#colorCompleted)"
+                strokeWidth={2}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
         </div>
       </div>
 
