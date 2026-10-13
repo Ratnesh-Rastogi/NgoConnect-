@@ -71,35 +71,65 @@ model User {
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
-  ngoProfile   NgoProfile?
-  resources    Resource[]
-  transfers    Transfer[]  @relation("DonorTransfers")
+  ngoProfile          NgoProfile?
+  resources           Resource[]
+  transfers           Transfer[]               @relation("DonorTransfers")
+  verificationReviews NgoVerificationReview[]  @relation("AdminVerificationReviews")
 
   @@map("users")
 }
 
 model NgoProfile {
-  id                 String             @id @default(uuid())
-  userId             String             @unique
-  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  orgName            String
-  regNumber          String             @unique
-  description        String
-  categoryId         String
-  category           Category           @relation(fields: [categoryId], references: [id])
-  contactPhone       String
-  address            String
-  city               String
-  verificationStatus VerificationStatus @default(PENDING)
-  verificationNotes  String?
-  verificationDocUrl String?
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
+  id                  String                  @id @default(uuid())
+  userId              String                  @unique
+  user                User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orgName             String
+  regNumber           String                  @unique
+  description         String
+  categoryId          String
+  category            Category                @relation(fields: [categoryId], references: [id])
+  contactPhone        String
+  address             String
+  city                String
+  verificationStatus  VerificationStatus      @default(PENDING)
+  verificationNotes   String?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
 
-  requests           ResourceRequest[]
-  transfersReceived  Transfer[]         @relation("NgoTransfers")
+  documents           NgoDocument[]
+  verificationReviews NgoVerificationReview[]
+  requests            ResourceRequest[]
+  transfersReceived   Transfer[]              @relation("NgoTransfers")
 
   @@map("ngo_profiles")
+}
+
+model NgoDocument {
+  id           String     @id @default(uuid())
+  ngoProfileId String
+  ngoProfile   NgoProfile @relation(fields: [ngoProfileId], references: [id], onDelete: Cascade)
+  docType      String
+  originalName String
+  storageKey   String     @unique
+  mimeType     String
+  fileSize     Int
+  createdAt    DateTime   @default(now())
+
+  @@map("ngo_documents")
+}
+
+model NgoVerificationReview {
+  id           String             @id @default(uuid())
+  ngoProfileId String
+  ngoProfile   NgoProfile         @relation(fields: [ngoProfileId], references: [id], onDelete: Cascade)
+  reviewerId   String?
+  reviewer     User?              @relation("AdminVerificationReviews", fields: [reviewerId], references: [id], onDelete: Cascade)
+  fromStatus   VerificationStatus
+  toStatus     VerificationStatus
+  notes        String
+  createdAt    DateTime           @default(now())
+
+  @@map("ngo_verification_reviews")
 }
 
 model ResourceRequest {

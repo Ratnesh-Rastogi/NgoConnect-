@@ -23,6 +23,7 @@ export const toAuthUser = (user) => {
           orgName: user.ngoProfile.orgName,
           category: user.ngoProfile.category,
           verificationStatus: user.ngoProfile.verificationStatus,
+          verificationNotes: user.ngoProfile.verificationNotes,
           city: user.ngoProfile.city
         }
       : null

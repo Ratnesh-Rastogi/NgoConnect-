@@ -66,7 +66,6 @@ export const registerUser = async (data) => {
           contactPhone: data.contactPhone,
           address: data.address,
           city: data.city,
-          verificationDocUrl: data.verificationDocUrl || null,
           verificationStatus: 'PENDING' // Newly registered NGOs always start as PENDING
         }
       });

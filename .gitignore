@@ -1,7 +1,6 @@
-@"
 node_modules
 .env
 dist
 pgdata
+uploads
 server/uploads
-"@ | Set-Content .gitignore

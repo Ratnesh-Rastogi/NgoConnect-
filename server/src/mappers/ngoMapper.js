@@ -29,7 +29,6 @@ export const toPrivateNgo = (ngo) => {
     city: ngo.city,
     verificationStatus: ngo.verificationStatus,
     verificationNotes: ngo.verificationNotes,
-    verificationDocUrl: ngo.verificationDocUrl,
     createdAt: ngo.createdAt,
     updatedAt: ngo.updatedAt,
     user: ngo.user
@@ -38,6 +37,26 @@ export const toPrivateNgo = (ngo) => {
           name: ngo.user.name,
           email: ngo.user.email
         }
+      : undefined,
+    documents: ngo.documents
+      ? ngo.documents.map((d) => ({
+          id: d.id,
+          docType: d.docType,
+          originalName: d.originalName,
+          mimeType: d.mimeType,
+          fileSize: d.fileSize,
+          createdAt: d.createdAt
+        }))
+      : undefined,
+    verificationReviews: ngo.verificationReviews
+      ? ngo.verificationReviews.map((r) => ({
+          id: r.id,
+          fromStatus: r.fromStatus,
+          toStatus: r.toStatus,
+          notes: r.notes,
+          reviewerName: r.reviewer?.name,
+          createdAt: r.createdAt
+        }))
       : undefined
   };
 };

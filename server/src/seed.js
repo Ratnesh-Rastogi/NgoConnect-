@@ -2,6 +2,7 @@ import 'dotenv/config';
 import bcrypt from 'bcryptjs';
 import { prisma } from './config/prisma.js';
 import { resolveCityCoordinates } from './utils/geo.js';
+import { saveFile } from './services/storageService.js';
 
 async function seed() {
   if (process.env.NODE_ENV === 'production') {
@@ -15,6 +16,8 @@ async function seed() {
   await prisma.transfer.deleteMany();
   await prisma.resource.deleteMany();
   await prisma.resourceRequest.deleteMany();
+  await prisma.ngoVerificationReview.deleteMany();
+  await prisma.ngoDocument.deleteMany();
   await prisma.ngoProfile.deleteMany();
   await prisma.user.deleteMany();
   await prisma.category.deleteMany();
@@ -50,6 +53,24 @@ async function seed() {
   });
   console.log(`[Seed] Created admin: ${admin.email}`);
 
+  // Helper to create a seeded valid PDF document
+  const seedDocument = async (ngoProfileId, docType, originalName) => {
+    const dummyPdfContent = Buffer.from(
+      '%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF'
+    );
+    const storageKey = await saveFile(dummyPdfContent, originalName, 'application/pdf');
+    return prisma.ngoDocument.create({
+      data: {
+        ngoProfileId,
+        docType,
+        originalName,
+        storageKey,
+        mimeType: 'application/pdf',
+        fileSize: dummyPdfContent.length
+      }
+    });
+  };
+
   // 3. Create Approved NGO 1: Hope Relief Foundation
   const ngoUser1 = await prisma.user.create({
     data: {
@@ -72,6 +93,17 @@ async function seed() {
       city: 'New Delhi',
       verificationStatus: 'APPROVED',
       verificationNotes: 'Registered trust verified with official tax exemption certificate.'
+    }
+  });
+  await seedDocument(ngoProfile1.id, 'REGISTRATION_CERTIFICATE', 'hope_relief_trust_deed.pdf');
+  await seedDocument(ngoProfile1.id, 'TAX_EXEMPTION_12A_80G', 'hope_relief_80g_exemption.pdf');
+  await prisma.ngoVerificationReview.create({
+    data: {
+      ngoProfileId: ngoProfile1.id,
+      reviewerId: admin.id,
+      fromStatus: 'PENDING',
+      toStatus: 'APPROVED',
+      notes: 'Verified registration document and 80G tax certificate via government portal.'
     }
   });
 
@@ -99,8 +131,18 @@ async function seed() {
       verificationNotes: 'Audited annual reports submitted and approved.'
     }
   });
+  await seedDocument(ngoProfile2.id, 'REGISTRATION_CERTIFICATE', 'clean_water_society_reg.pdf');
+  await prisma.ngoVerificationReview.create({
+    data: {
+      ngoProfileId: ngoProfile2.id,
+      reviewerId: admin.id,
+      fromStatus: 'PENDING',
+      toStatus: 'APPROVED',
+      notes: 'Audited annual reports and society registration approved.'
+    }
+  });
 
-  // 5. Create PENDING NGO 3: Sunshine Animal Sanctuary
+  // 5. Create PENDING NGO 3: Sunshine Animal Sanctuary (appears in admin queue)
   const ngoUser3 = await prisma.user.create({
     data: {
       email: 'sunshine@animals.org',
@@ -110,7 +152,7 @@ async function seed() {
     }
   });
 
-  await prisma.ngoProfile.create({
+  const ngoProfile3 = await prisma.ngoProfile.create({
     data: {
       userId: ngoUser3.id,
       orgName: 'Sunshine Animal Sanctuary',
@@ -121,9 +163,11 @@ async function seed() {
       address: '22 Whitefield Main Rd',
       city: 'Bengaluru',
       verificationStatus: 'PENDING',
-      verificationNotes: 'Awaiting government registration certificate scan.'
+      verificationNotes: null
     }
   });
+  await seedDocument(ngoProfile3.id, 'REGISTRATION_CERTIFICATE', 'sunshine_animal_sanctuary_reg.pdf');
+  console.log(`[Seed] Seeded pending NGO with document for admin queue: ${ngoProfile3.orgName}`);
 
   // 6. Create Donor: Sarah Donor
   const donorUser = await prisma.user.create({
@@ -163,10 +207,10 @@ async function seed() {
     data: {
       ngoProfileId: ngoProfile1.id,
       title: 'Pediatric First-Aid & Essential Antibiotic Kits',
-      description: 'Urgent medical supplies required for flood-affected primary health clinics.',
+      description: 'Urgent medical aid kits for flood-affected families in trans-Yamuna settlements.',
       categoryId: categoryMap['healthcare'],
       urgency: 'HIGH',
-      quantityNeeded: 60,
+      quantityNeeded: 80,
       quantityFulfilled: 0,
       quantityReserved: 0,
       unit: 'medical kits',

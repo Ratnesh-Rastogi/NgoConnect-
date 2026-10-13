@@ -16,8 +16,7 @@ export const registerSchema = z
     category: z.string().optional(),
     contactPhone: z.string().min(5, 'Contact phone is required for NGOs').optional(),
     address: z.string().min(3, 'Address is required for NGOs').optional(),
-    city: z.string().min(2, 'City is required for NGOs').optional(),
-    verificationDocUrl: z.string().optional()
+    city: z.string().min(2, 'City is required for NGOs').optional()
   })
   .superRefine((data, ctx) => {
     if (data.role === 'ngo') {
