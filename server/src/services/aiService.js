@@ -2,7 +2,7 @@ import { prisma } from '../config/prisma.js';
 
 // Calculate match score between a donor offer and an NGO resource need
 export const matchDonorOffer = async ({ category, itemName, quantity, location }) => {
-  // Find open requests from APPROVED NGOs
+  // Find open requests from APPROVED NGOs (category is loaded now)
   const openRequests = await prisma.resourceRequest.findMany({
     where: {
       status: { in: ['OPEN', 'PARTIAL'] },
@@ -11,11 +11,16 @@ export const matchDonorOffer = async ({ category, itemName, quantity, location }
       }
     },
     include: {
-      ngoProfile: true
+      ngoProfile: true,
+      category: true
     }
   });
 
-  const offerTokens = (itemName || '')
+  // Make every input safe, so nothing is ever undefined
+  const categoryInput = String(category ?? '').trim().toLowerCase();
+  const locationInput = String(location ?? '').trim().toLowerCase();
+
+  const offerTokens = String(itemName ?? '')
     .toLowerCase()
     .split(/\s+/)
     .filter((t) => t.length > 2);
@@ -24,20 +29,29 @@ export const matchDonorOffer = async ({ category, itemName, quantity, location }
     let score = 0;
     const reasons = [];
 
-    // 1. Category alignment
-    if (req.category.toLowerCase() === category.toLowerCase()) {
-      score += 35;
-      reasons.push(`Direct category match in "${req.category}"`);
-    } else if (
-      req.category.toLowerCase().includes(category.toLowerCase()) ||
-      category.toLowerCase().includes(req.category.toLowerCase())
-    ) {
-      score += 20;
-      reasons.push(`Related category match`);
+    // Safe values for this request
+    const reqCategoryName = String(req.category?.name ?? '');
+    const reqCategory = reqCategoryName.toLowerCase();
+    const reqCategorySlug = String(req.category?.slug ?? '').toLowerCase();
+    const reqLocationText = String(req.location ?? req.city ?? '');
+    const reqLocation = reqLocationText.toLowerCase();
+
+    // 1. Category alignment (match by name or slug)
+    if (categoryInput && reqCategory) {
+      if (reqCategory === categoryInput || reqCategorySlug === categoryInput) {
+        score += 35;
+        reasons.push(`Direct category match in "${reqCategoryName}"`);
+      } else if (
+        reqCategory.includes(categoryInput) ||
+        categoryInput.includes(reqCategory)
+      ) {
+        score += 20;
+        reasons.push('Related category match');
+      }
     }
 
     // 2. Keyword relevance in title and description
-    const textBlob = `${req.title} ${req.description}`.toLowerCase();
+    const textBlob = `${req.title ?? ''} ${req.description ?? ''}`.toLowerCase();
     let keywordHits = 0;
     for (const token of offerTokens) {
       if (textBlob.includes(token)) {
@@ -45,9 +59,8 @@ export const matchDonorOffer = async ({ category, itemName, quantity, location }
       }
     }
     if (keywordHits > 0) {
-      const kwScore = Math.min(30, keywordHits * 15);
-      score += kwScore;
-      reasons.push(`Matched keywords in request title/description`);
+      score += Math.min(30, keywordHits * 15);
+      reasons.push('Matched keywords in request title/description');
     }
 
     // 3. Urgency weighting
@@ -65,21 +78,21 @@ export const matchDonorOffer = async ({ category, itemName, quantity, location }
 
     // 4. Location proximity
     if (
-      location &&
-      req.location &&
-      (req.location.toLowerCase().includes(location.toLowerCase()) ||
-        location.toLowerCase().includes(req.location.toLowerCase()))
+      locationInput &&
+      reqLocation &&
+      (reqLocation.includes(locationInput) || locationInput.includes(reqLocation))
     ) {
       score += 15;
-      reasons.push(`Matches location "${req.location}"`);
+      reasons.push(`Matches location "${reqLocationText}"`);
     }
 
     // 5. Quantity compatibility
-    const unreserved = req.quantityNeeded - req.quantityFulfilled - req.quantityReserved;
+    const unreserved =
+      (req.quantityNeeded ?? 0) - (req.quantityFulfilled ?? 0) - (req.quantityReserved ?? 0);
     if (unreserved > 0 && quantity > 0) {
       if (quantity <= unreserved) {
         score += 10;
-        reasons.push(`Can immediately utilize ${quantity} ${req.unit}`);
+        reasons.push(`Can immediately utilize ${quantity} ${req.unit ?? 'units'}`);
       } else {
         score += 5;
         reasons.push(`Partially fulfills request (${unreserved} needed)`);
